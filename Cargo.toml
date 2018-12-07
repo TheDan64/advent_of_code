@@ -1,0 +1,15 @@
+[package]
+name = "aoc-2018"
+version = "0.1.0"
+authors = ["Daniel Kolsoi <thadan64@gmail.com>"]
+edition = "2018"
+
+[lib]
+bench = false
+
+[dependencies]
+aoc-runner = "0.2.0"
+aoc-runner-derive = "0.2.0"
+chrono = "0.4"
+lazy_static = "*"
+regex = "*"
