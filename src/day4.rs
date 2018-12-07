@@ -10,7 +10,7 @@ lazy_static! {
 
 #[derive(Debug)]
 enum UnfinishedRowType {
-    Begin { guard_id: u64 },
+    Begin { guard_id: u32 },
     Wake,
     FallAsleep,
 }
@@ -29,7 +29,7 @@ struct UnfinishedRow {
 
 pub struct GuardAction {
     datetime: NaiveDateTime,
-    guard_id: u64,
+    guard_id: u32,
     action_type: ActionType,
 }
 
@@ -41,7 +41,7 @@ pub fn input_generator(input: &str) -> Vec<GuardAction> {
         let day = cap[3].parse::<u32>().unwrap();
         let hour = cap[4].parse::<u32>().unwrap();
         let minute = cap[5].parse::<u32>().unwrap();
-        let guard_num = cap.get(7).map(|m| m.as_str().parse::<u64>().unwrap());
+        let guard_num = cap.get(7).map(|m| m.as_str().parse::<u32>().unwrap());
 
         let row_type = if let Some(guard_id) = guard_num {
             UnfinishedRowType::Begin { guard_id }
@@ -82,7 +82,7 @@ pub fn input_generator(input: &str) -> Vec<GuardAction> {
         .collect()
 }
 
-fn get_time_and_minutes_asleep(actions: &[GuardAction]) -> (HashMap<u64, u64>, HashMap<(u64, u32), u64>) {
+fn get_time_and_minutes_asleep(actions: &[GuardAction]) -> (HashMap<u32, u32>, HashMap<(u32, u32), u32>) {
     let mut time_asleep = HashMap::new();
     let mut minutes_asleep = HashMap::new();
     let mut fell_asleep_at = None;
@@ -94,14 +94,14 @@ fn get_time_and_minutes_asleep(actions: &[GuardAction]) -> (HashMap<u64, u64>, H
                 let time_asleep = time_asleep.entry(action.guard_id).or_insert(0);
                 let diff = action.datetime - fell_asleep_at.unwrap();
 
-                *time_asleep += diff.num_minutes() as u64;
+                *time_asleep += diff.num_minutes() as u32;
 
                 let start_minute = fell_asleep_at.unwrap().minute();
                 let end_minute = start_minute + diff.num_minutes() as u32;
 
                 for minute in start_minute..end_minute {
                     let minute = minute % 60;
-                    let mut minute_asleep = minutes_asleep.entry((action.guard_id, minute)).or_insert(0);
+                    let minute_asleep = minutes_asleep.entry((action.guard_id, minute)).or_insert(0);
 
                     *minute_asleep += 1;
                 }
@@ -116,7 +116,7 @@ fn get_time_and_minutes_asleep(actions: &[GuardAction]) -> (HashMap<u64, u64>, H
 }
 
 #[aoc(day4, part1, Chars)]
-pub fn part1_chars(actions: &[GuardAction]) -> u64 {
+pub fn part1_chars(actions: &[GuardAction]) -> u32 {
     let (time_asleep, minutes_asleep) = get_time_and_minutes_asleep(&actions);
     let mut guard_id = 0;
     let mut max_time_asleep = 0;
@@ -141,11 +141,11 @@ pub fn part1_chars(actions: &[GuardAction]) -> u64 {
         }
     }
 
-    guard_id * most_asleep_minute as u64
+    guard_id * most_asleep_minute
 }
 
 #[aoc(day4, part2, Chars)]
-pub fn part2_chars(actions: &[GuardAction]) -> u64 {
+pub fn part2_chars(actions: &[GuardAction]) -> u32 {
     let (_, minutes_asleep) = get_time_and_minutes_asleep(actions);
     let mut minute = 0;
     let mut guard_id = 0;
@@ -159,5 +159,5 @@ pub fn part2_chars(actions: &[GuardAction]) -> u64 {
         }
     }
 
-    guard_id * minute as u64
+    guard_id * minute
 }

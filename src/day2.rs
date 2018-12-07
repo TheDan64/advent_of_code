@@ -58,7 +58,6 @@ pub fn part2_chars(input: &str) -> String {
 
     let iter1 = lines.iter();
     let iter2 = lines.iter().skip(1);
-
     let joined = iter1.zip(iter2);
 
     for (first, next) in joined {
