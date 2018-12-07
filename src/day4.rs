@@ -8,9 +8,12 @@ lazy_static! {
     static ref FORMAT: Regex = Regex::new(r"\[(\d+)-(\d+)-(\d+) (\d+):(\d+)\] \w+ (#(\d+))?").unwrap();
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct GuardId(u32);
+
 #[derive(Debug)]
 enum UnfinishedRowType {
-    Begin { guard_id: u32 },
+    Begin { guard_id: GuardId },
     Wake,
     FallAsleep,
 }
@@ -29,7 +32,7 @@ struct UnfinishedRow {
 
 pub struct GuardAction {
     datetime: NaiveDateTime,
-    guard_id: u32,
+    guard_id: GuardId,
     action_type: ActionType,
 }
 
@@ -44,7 +47,7 @@ pub fn input_generator(input: &str) -> Vec<GuardAction> {
         let guard_num = cap.get(7).map(|m| m.as_str().parse::<u32>().unwrap());
 
         let row_type = if let Some(guard_id) = guard_num {
-            UnfinishedRowType::Begin { guard_id }
+            UnfinishedRowType::Begin { guard_id: GuardId(guard_id) }
         } else if cap[0].ends_with("wakes ") {
             UnfinishedRowType::Wake
         } else {
@@ -59,7 +62,7 @@ pub fn input_generator(input: &str) -> Vec<GuardAction> {
 
     unfinished_rows.sort_by(|row, row2| row.datetime.cmp(&row2.datetime));
 
-    let mut guard_id = 0;
+    let mut guard_id = GuardId(0);
 
     unfinished_rows.iter()
         .map(|row| {
@@ -82,7 +85,7 @@ pub fn input_generator(input: &str) -> Vec<GuardAction> {
         .collect()
 }
 
-fn get_time_and_minutes_asleep(actions: &[GuardAction]) -> (HashMap<u32, u32>, HashMap<(u32, u32), u32>) {
+fn get_time_and_minutes_asleep(actions: &[GuardAction]) -> (HashMap<GuardId, u32>, HashMap<(GuardId, u32), u32>) {
     let mut time_asleep = HashMap::new();
     let mut minutes_asleep = HashMap::new();
     let mut fell_asleep_at = None;
@@ -118,7 +121,7 @@ fn get_time_and_minutes_asleep(actions: &[GuardAction]) -> (HashMap<u32, u32>, H
 #[aoc(day4, part1, Chars)]
 pub fn part1_chars(actions: &[GuardAction]) -> u32 {
     let (time_asleep, minutes_asleep) = get_time_and_minutes_asleep(&actions);
-    let mut guard_id = 0;
+    let mut guard_id = GuardId(0);
     let mut max_time_asleep = 0;
 
     for (id, time_asleep) in time_asleep.iter() {
@@ -141,14 +144,14 @@ pub fn part1_chars(actions: &[GuardAction]) -> u32 {
         }
     }
 
-    guard_id * most_asleep_minute
+    guard_id.0 * most_asleep_minute
 }
 
 #[aoc(day4, part2, Chars)]
 pub fn part2_chars(actions: &[GuardAction]) -> u32 {
     let (_, minutes_asleep) = get_time_and_minutes_asleep(actions);
     let mut minute = 0;
-    let mut guard_id = 0;
+    let mut guard_id = GuardId(0);
     let mut times_asleep = 0;
 
     for ((id, min), current_times_asleep) in minutes_asleep {
@@ -159,5 +162,5 @@ pub fn part2_chars(actions: &[GuardAction]) -> u32 {
         }
     }
 
-    guard_id * minute
+    guard_id.0 * minute
 }
