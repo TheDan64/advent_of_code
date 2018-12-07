@@ -13,7 +13,7 @@ pub struct GuardId(u32);
 
 #[derive(Debug)]
 enum UnfinishedRowType {
-    Begin { guard_id: GuardId },
+    Begin(GuardId),
     Wake,
     FallAsleep,
 }
@@ -47,7 +47,7 @@ pub fn input_generator(input: &str) -> Vec<GuardAction> {
         let guard_num = cap.get(7).map(|m| m.as_str().parse::<u32>().unwrap());
 
         let row_type = if let Some(guard_id) = guard_num {
-            UnfinishedRowType::Begin { guard_id: GuardId(guard_id) }
+            UnfinishedRowType::Begin(GuardId(guard_id))
         } else if cap[0].ends_with("wakes ") {
             UnfinishedRowType::Wake
         } else {
@@ -67,7 +67,7 @@ pub fn input_generator(input: &str) -> Vec<GuardAction> {
     unfinished_rows.iter()
         .map(|row| {
             let action_type = match row.row_type {
-                UnfinishedRowType::Begin { guard_id: id } => {
+                UnfinishedRowType::Begin(id) => {
                     guard_id = id;
 
                     ActionType::Begin
