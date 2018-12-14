@@ -72,7 +72,8 @@ fn find_lowest_area_points(points: &[Point]) -> (i64, Vec<Point>) {
     let mut variance = u64::max_value();
     let mut variance_i = 0;
 
-    for i in 0..=25000 {
+    // Find minimum area
+    for i in 1.. {
         // Update positions
         for mut point in points2.iter_mut() {
             point.x += point.velocity_x;
@@ -84,10 +85,10 @@ fn find_lowest_area_points(points: &[Point]) -> (i64, Vec<Point>) {
         if var < variance {
             variance = var;
             variance_i = i;
+        } else {
+            break;
         }
     }
-
-    variance_i += 1;
 
     let mut points3 = points.into_iter().map(|x| *x).collect::<Vec<Point>>();
 

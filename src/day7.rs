@@ -9,7 +9,7 @@ lazy_static! {
 }
 
 #[aoc_generator(day7)]
-pub fn input_generator(input: &str) -> Box<HashMap<char, Vec<char>>> {
+pub fn input_generator(input: &str) -> HashMap<char, Vec<char>> {
     let mut before_steps = HashMap::new();
 
     for cap in FORMAT.captures_iter(input) {
@@ -20,8 +20,7 @@ pub fn input_generator(input: &str) -> Box<HashMap<char, Vec<char>>> {
         entry.push(step);
     }
 
-    // Box is a work around for cargo-aoc which assumes AsRef for the return type
-    Box::new(before_steps)
+    before_steps
 }
 
 static CHARS: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
