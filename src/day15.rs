@@ -26,10 +26,10 @@ impl Tile {
             Tile::Goblin { ref mut hp } => hp,
             _ => panic!("Attacking non sentient creature"),
         };
-        let is_elf = match self {
-            Tile::Elf { .. } => true,
-            _ => false,
-        };
+        // let is_elf = match self {
+        //     Tile::Elf { .. } => true,
+        //     _ => false,
+        // };
 
         // println!("{} takes {} damage to {} hp", if is_elf { "Elf" } else { "Goblin" }, damage, hp);
 
@@ -340,7 +340,7 @@ impl Map {
         let mut g_vals: HashMap<usize, u64> = HashMap::new();
         let mut h_vals: HashMap<usize, u64> = HashMap::new();
         let mut parents: HashMap<usize, usize> = HashMap::new();
-        let start_index = index;
+        // let start_index = index;
 
         assert_ne!(self.tiles[index2], Tile::Wall);
         assert_ne!(self.tiles[index2], Tile::Open);
@@ -522,7 +522,7 @@ impl Map {
 
                 for enemy_pos in enemies {
                     // println!("pre get path: {}, {}", possible_move, enemy_pos);
-                    let mut new_path = self.get_shortest_path(possible_move, *enemy_pos);
+                    let new_path = self.get_shortest_path(possible_move, *enemy_pos);
 
                     // println!("potential path: {:?} current path: {:?}", new_path, path);
 
@@ -594,8 +594,6 @@ impl Map {
 
                 already_moved_npcs.insert(i);
             }
-
-            already_moved_npcs.insert(i);
         }
 
 
@@ -966,3 +964,96 @@ fn test_aoc_p2() {
 
 //     assert_eq!(map.total_turns, 37);
 // }
+
+#[test]
+fn test_reddit_p2() {
+    let input = "################################
+#...############################
+###G.###########################
+##.....#########################
+#......#########################
+##G...G.########################
+#G.....G########################
+###...G#########################
+###....#########################
+######.G.#######################
+#######....#####################
+###..#.....GG...G.E...##########
+##........G...#####...##.#######
+#.G..........#######...#..######
+#...####G...#########......#####
+#..G##.#..G.#########.......####
+#...##....E.#########...E.....##
+#...##......#########G......####
+#...........#########.......####
+#............#######...........#
+#.....E..G...E#####E...........#
+#.G...........G.............E###
+#...............E#####.#..######
+#..#..G...........####...#######
+#..#..............######.#######
+####.#...E.......###############
+########..##...#################
+##...##..###..##################
+#.......########################
+##...E..########################
+###......#######################
+################################";
+    let mut map = input_generator(input);
+
+    while map.execute_round(25) {
+        println!("Turn {}:\n{}", map.total_turns, map);
+
+        if map.total_turns == 20 {
+            break;
+        }
+    }
+
+    let elf1 = map.tiles[7];
+    let elf2 = map.tiles[12];
+    let elf3 = map.tiles[13];
+
+    assert!(elf1.is_elf(), "{:?}", elf1);
+    assert_eq!(elf1.hp(), 134, "{:?}", elf1);
+
+    assert!(elf2.is_elf(), "{:?}", elf2);
+    assert_eq!(elf2.hp(), 2, "{:?}", elf2);
+
+    assert!(elf3.is_elf(), "{:?}", elf3);
+    assert_eq!(elf3.hp(), 200, "{:?}", elf3);
+}
+
+#[test]
+fn test_damage() {
+    let input = "\
+####
+##E#
+#GG#
+####";
+    let mut map = input_generator(input);
+
+    while map.execute_round(3) {
+        println!("Turn {}:\n{}", map.total_turns, map);
+
+        // if map.total_turns == 20 {
+        //     break;
+        // }
+    }
+
+    assert_eq!(map.total_turns, 71);
+
+    println!("End: {}", map);
+
+    let goblin1 = map.tiles[9];
+    let elf2 = map.tiles[12];
+    let elf3 = map.tiles[13];
+
+    assert!(goblin1.is_goblin(), "{:?}", goblin1);
+    assert_eq!(goblin1.hp(), 3, "{:?}", goblin1);
+
+    assert!(elf2.is_elf(), "{:?}", elf2);
+    assert_eq!(elf2.hp(), 2, "{:?}", elf2);
+
+    assert!(elf3.is_elf(), "{:?}", elf3);
+    assert_eq!(elf3.hp(), 200, "{:?}", elf3);
+}
