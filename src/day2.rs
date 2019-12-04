@@ -1,76 +1,60 @@
-use std::collections::HashMap;
+fn process(values: &[usize], noun: usize, verb: usize) -> Vec<usize> {
+    let mut values = values.to_vec();
 
-#[aoc(day2, part1, Chars)]
-pub fn part1_chars(input: &str) -> i32 {
-    let lines_iter = input
-        .split('\n')
-        .filter(|s| s.len() != 0);
-    let mut twos = 0;
-    let mut threes = 0;
-    let mut count = HashMap::new();
+    values[1] = noun;
+    values[2] = verb;
 
-    for line in lines_iter {
-        let chars = line.chars();
+    let mut skip = 0;
 
-        count.clear();
-
-        let mut found_two = false;
-        let mut found_three = false;
-
-        for ch in chars {
-            *count.entry(ch).or_insert(0) += 1;
+    for i in 0..values.len() {
+        if skip > 0 {
+            skip -= 1;
+            continue;
         }
 
-        for val in count.values() {
-            if *val == 2 && !found_two {
-                twos += 1;
-
-                found_two = true;
-            }
-
-            if *val == 3 && !found_three {
-                threes += 1;
-
-                found_three = true;
-            }
+        match values[i] {
+            1 => {
+                let (x, y, dest) = (values[i + 1], values[i + 2], values[i + 3]);
+                values[dest as usize] = values[x as usize] + values[y as usize];
+                skip += 3;
+            },
+            2 => {
+                let (x, y, dest) = (values[i + 1], values[i + 2], values[i + 3]);
+                values[dest as usize] = values[x as usize] * values[y as usize];
+                skip += 3;
+            },
+            99 => break,
+            _ => unreachable!(),
         }
     }
 
-    twos * threes
+    values
 }
 
-fn remove_diff(lstr: &str, rstr: &str) -> String {
-    lstr.chars()
-        .zip(rstr.chars())
-        .filter(|(lchar, rchar)| lchar == rchar)
-        .map(|(lchar, _)| lchar)
-        .collect()
+#[aoc(day2, part1, Chars)]
+pub fn part1_chars(input: &str) -> usize {
+    let values: Vec<_> = input
+        .split(',')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.parse::<usize>().unwrap())
+        .collect();
+
+    process(&values, 12, 2)[0]
 }
 
 #[aoc(day2, part2, Chars)]
-pub fn part2_chars(input: &str) -> String {
-    let mut lines: Vec<&str> = input
-        .split('\n')
-        .filter(|s| s.len() != 0)
+pub fn part2_chars(input: &str) -> usize {
+    let values: Vec<_> = input
+        .split(',')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.parse::<usize>().unwrap())
         .collect();
 
-    lines.sort();
-
-    let iter1 = lines.iter();
-    let iter2 = lines.iter().skip(1);
-    let joined = iter1.zip(iter2);
-
-    for (first, next) in joined {
-        let mut diff = 0;
-
-        for (ch1, ch2) in first.chars().zip(next.chars()) {
-            if ch1 != ch2 {
-                diff += 1;
+    for noun in 0..=99 {
+        for verb in 0..=99 {
+            if process(&values, noun, verb)[0] == 19_690_720 {
+                return 100 * noun + verb;
             }
-        }
-
-        if diff == 1 {
-            return remove_diff(first, next);
         }
     }
 
