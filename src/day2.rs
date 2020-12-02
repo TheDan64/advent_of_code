@@ -51,6 +51,8 @@ pub fn input_generator(input: &str) -> Vec<(Policy, String)> {
             let max = split.next().unwrap().parse().unwrap();
             let policy = Policy { min, max, ch };
 
+            // Calls to_string since cargo-aoc doesn't support lifetimes in
+            // generator output :(
             (policy, password.to_string())
         })
         .collect()
