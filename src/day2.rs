@@ -1,62 +1,90 @@
-fn process(values: &[usize], noun: usize, verb: usize) -> Vec<usize> {
-    let mut values = values.to_vec();
+use std::collections::HashMap;
 
-    values[1] = noun;
-    values[2] = verb;
+#[derive(Debug)]
+pub struct Counter(HashMap<char, usize>);
 
-    let mut skip = 0;
+impl Counter {
+    fn new(s: &str) -> Self {
+        let mut counter = Counter(HashMap::new());
 
-    for i in 0..values.len() {
-        if skip > 0 {
-            skip -= 1;
-            continue;
+        for ch in s.chars() {
+            counter.add_char(ch);
         }
 
-        match values[i] {
-            1 => {
-                let (x, y, dest) = (values[i + 1], values[i + 2], values[i + 3]);
-                values[dest as usize] = values[x as usize] + values[y as usize];
-                skip += 3;
-            },
-            2 => {
-                let (x, y, dest) = (values[i + 1], values[i + 2], values[i + 3]);
-                values[dest as usize] = values[x as usize] * values[y as usize];
-                skip += 3;
-            },
-            99 => break,
-            _ => unreachable!(),
+        counter
+    }
+
+    fn add_char(&mut self, ch: char) {
+        let entry = self.0.entry(ch).or_insert(0);
+
+        *entry += 1;
+    }
+
+    fn get(&self, ch: char) -> usize {
+        *self.0.get(&ch).unwrap_or(&0)
+    }
+}
+
+#[derive(Debug)]
+pub struct Policy {
+    min: usize,
+    max: usize,
+    ch: char,
+}
+
+#[aoc_generator(day2)]
+pub fn input_generator(input: &str) -> Vec<(Policy, String)> {
+    input
+        .split('\n')
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            let mut split = s.split(": ");
+            let policy = split.next().unwrap();
+            let password = split.next().unwrap();
+
+            let mut split = policy.split(' ');
+            let range = split.next().unwrap();
+            let ch = split.next().unwrap().chars().next().unwrap();
+
+            let mut split = range.split('-');
+            let min = split.next().unwrap().parse().unwrap();
+            let max = split.next().unwrap().parse().unwrap();
+            let policy = Policy { min, max, ch };
+
+            (policy, password.to_string())
+        })
+        .collect()
+}
+
+#[aoc(day2, part1)]
+pub fn part1(input: &[(Policy, String)]) -> usize {
+    let mut valid = 0;
+
+    for (policy, password) in input {
+        let counter = Counter::new(&password);
+        let count = counter.get(policy.ch);
+
+        if count >= policy.min && count <= policy.max {
+            valid += 1;
         }
     }
 
-    values
+    valid
 }
 
-#[aoc(day2, part1, Chars)]
-pub fn part1_chars(input: &str) -> usize {
-    let values: Vec<_> = input
-        .split(',')
-        .filter(|s| !s.is_empty())
-        .map(|s| s.parse::<usize>().unwrap())
-        .collect();
+#[aoc(day2, part2)]
+pub fn part2(input: &[(Policy, String)]) -> usize {
+    let mut valid = 0;
 
-    process(&values, 12, 2)[0]
-}
+    for (policy, password) in input {
+        let password = password.as_bytes();
+        let first = password[policy.min - 1] == policy.ch as u8;
+        let second = password[policy.max - 1] == policy.ch as u8;
 
-#[aoc(day2, part2, Chars)]
-pub fn part2_chars(input: &str) -> usize {
-    let values: Vec<_> = input
-        .split(',')
-        .filter(|s| !s.is_empty())
-        .map(|s| s.parse::<usize>().unwrap())
-        .collect();
-
-    for noun in 0..=99 {
-        for verb in 0..=99 {
-            if process(&values, noun, verb)[0] == 19_690_720 {
-                return 100 * noun + verb;
-            }
+        if first ^ second {
+            valid += 1;
         }
     }
 
-    unreachable!()
+    valid
 }
