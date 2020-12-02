@@ -14,12 +14,12 @@ pub fn part1(nums: &[u32]) -> u32 {
     let mut map = HashSet::with_capacity(nums.len());
 
     // Optimized solution: O(n) worst case
-    for num in nums {
+    for num in nums.iter().copied() {
         if map.get(&(2020 - num)).is_some() {
             return num * (2020 - num);
         }
 
-        map.insert(*num);
+        map.insert(num);
     }
 
     unreachable!()
@@ -27,15 +27,17 @@ pub fn part1(nums: &[u32]) -> u32 {
 
 #[aoc(day1, part2)]
 pub fn part2(nums: &[u32]) -> u32 {
-    // Slightly less naive solution: O(𝑛^3 − 3𝑛^2 + 2𝑛)
-    for (i, num) in nums.iter().enumerate() {
-        for (j, num2) in nums[i + 1..].iter().enumerate() {
-            for num3 in &nums[i + j + 2..] {
-                if num + num2 + num3 == 2020 {
-                    return num * num2 * num3;
-                }
+    let mut map = HashSet::with_capacity(nums.len());
+
+    // Optimized solution: O(n^2 - n) worst case
+    for (i, num) in nums.iter().copied().enumerate() {
+        for num2 in &nums[i + 1..] {
+            if map.get(&(2020 - num - num2)).is_some() {
+                return num * num2 * (2020 - num - num2);
             }
         }
+
+        map.insert(num);
     }
 
     unreachable!()
