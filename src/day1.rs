@@ -1,13 +1,14 @@
 #[aoc(day1, part1)]
 pub fn part1_chars(input: &str) -> u32 {
-    let num_strs = input
+    let num_strs: Vec<_> = input
         .split('\n')
         .filter(|s| !s.is_empty())
-        .map(|s| s.parse::<u32>().unwrap());
+        .map(|s| s.parse::<u32>().unwrap())
+        .collect();
 
-    // Naive solution; yolo
-    for num in num_strs.clone() {
-        for num2 in num_strs.clone() {
+    // Non-naive solution
+    for (i, num) in num_strs.iter().enumerate() {
+        for num2 in &num_strs[i + 1..] {
             if num + num2 == 2020 {
                 return num * num2;
             }
