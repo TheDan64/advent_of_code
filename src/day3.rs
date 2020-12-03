@@ -1,112 +1,63 @@
-use lazy_static::lazy_static;
-use regex::Regex;
-
-lazy_static! {
-    static ref FORMAT: Regex = Regex::new(r"#(\d+) @ (\d+),(\d+): (\d+)x(\d+)").unwrap();
+struct Position {
+    x: usize,
+    y: usize,
 }
 
-const Y_HEIGHT: usize = 1000;
-
-#[derive(Debug)]
-pub struct Claim {
-    id: u16,
-    x: u16,
-    y: u16,
-    width: u16,
-    height: u16,
-}
-
-impl Claim {
-    fn draw_on(&self, fabric: &mut [Option<FabricType>]) {
-        let x2 = self.x + self.width;
-        let y2 = self.y + self.height;
-
-        for x in self.x..x2 {
-            for y in self.y..y2 {
-                let tile = &mut fabric[y as usize * Y_HEIGHT + x as usize];
-                let tile_taken = tile.take();
-
-                *tile = match tile_taken {
-                    None => Some(FabricType::Claimed { id: self.id }),
-                    Some(FabricType::Claimed { id }) =>
-                        Some(FabricType::ClaimedMultiple { ids: vec![id, self.id] }),
-                    Some(FabricType::ClaimedMultiple { mut ids }) => {
-                        ids.push(self.id);
-
-                        Some(FabricType::ClaimedMultiple { ids })
-                    }
-                }
-            }
-        }
-    }
-
-    fn has_overlap(&self, fabric: &[Option<FabricType>]) -> bool {
-        let x2 = self.x + self.width;
-        let y2 = self.y + self.height;
-
-        for x in self.x..x2 {
-            for y in self.y..y2 {
-                let tile = &fabric[y as usize * Y_HEIGHT + x as usize];
-
-                if let Some(FabricType::ClaimedMultiple { .. }) = tile {
-                    return true;
-                }
-            }
-        }
-
-        false
-    }
-}
-
-// This is sort of like a SmallVec
-#[derive(Clone, Debug)]
-enum FabricType {
-    Claimed { id: u16, },
-    ClaimedMultiple { ids: Vec<u16>, },
+struct Slope {
+    right: usize,
+    down: usize,
 }
 
 #[aoc_generator(day3)]
-pub fn input_generator(input: &str) -> Vec<Claim> {
-    FORMAT.captures_iter(input).map(|cap| {
-        Claim {
-            id: cap[1].parse::<u16>().unwrap(),
-            x: cap[2].parse::<u16>().unwrap(),
-            y: cap[3].parse::<u16>().unwrap(),
-            width: cap[4].parse::<u16>().unwrap(),
-            height: cap[5].parse::<u16>().unwrap(),
-        }
-    }).collect()
+pub fn input_generator(input: &str) -> Vec<Vec<u8>> {
+    input
+        .split('\n')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.as_bytes())
+        .map(ToOwned::to_owned)
+        .collect()
 }
 
-#[aoc(day3, part1, Chars)]
-pub fn part1_chars(claims: &[Claim]) -> usize {
-    let mut fabric: Vec<Option<FabricType>> = vec![None; 1_000_000];
+fn calc_trees_hit(slope: &Slope, rows: &[Vec<u8>]) -> usize {
+    let mut trees_hit = 0;
+    let mut pos = Position { x: 0, y: 0 };
+    let map_width = rows[0].len();
+    let map_height = rows.len();
 
-    for claim in claims {
-        claim.draw_on(&mut fabric);
+    while pos.y < map_height {
+        pos.x += slope.right;
+        pos.y += slope.down;
+
+        if pos.y >= map_height {
+            break;
+        }
+
+        if pos.x >= map_width {
+            pos.x -= map_width;
+        }
+
+        if rows[pos.y][pos.x] == b'#' {
+            trees_hit += 1;
+        }
     }
 
-    fabric.iter().filter(|ft| {
-        match ft {
-            Some(FabricType::ClaimedMultiple { .. }) => true,
-            _ => false,
-        }
-    }).count()
+    trees_hit
 }
 
-#[aoc(day3, part2, Chars)]
-pub fn part2_chars(claims: &[Claim]) -> u16 {
-    let mut fabric: Vec<Option<FabricType>> = vec![None; 1_000_000];
+#[aoc(day3, part1)]
+pub fn part1(rows: &[Vec<u8>]) -> usize {
+    calc_trees_hit(&Slope { right: 3, down: 1 }, rows)
+}
 
-    for claim in claims {
-        claim.draw_on(&mut fabric);
-    }
+#[aoc(day3, part2)]
+pub fn part2(rows: &[Vec<u8>]) -> usize {
+    let slopes = [
+        Slope { right: 1, down: 1 },
+        Slope { right: 3, down: 1 },
+        Slope { right: 5, down: 1 },
+        Slope { right: 7, down: 1 },
+        Slope { right: 1, down: 2 },
+    ];
 
-    for claim in claims {
-        if !claim.has_overlap(&fabric) {
-            return claim.id;
-        }
-    }
-
-    unreachable!()
+    slopes.iter().map(|slope| calc_trees_hit(slope, rows)).product()
 }
