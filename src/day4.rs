@@ -71,15 +71,11 @@ impl Passport {
 
         let ecl = self.ecl.as_ref().unwrap();
 
-        dbg!(ecl);
-
         if !matches!(&**ecl, "amb" | "blu" | "brn" | "gry" | "grn" | "hzl" | "oth") {
             return false;
         }
 
         let pid = self.pid.as_ref().unwrap();
-
-
 
         if pid.len() != 9 || pid.parse::<u32>().is_err() {
             return false;
