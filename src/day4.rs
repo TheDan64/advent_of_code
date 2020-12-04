@@ -1,166 +1,145 @@
-use std::collections::HashMap;
-
-use chrono::{NaiveDateTime, NaiveDate, Timelike};
-use lazy_static::lazy_static;
-use regex::Regex;
-
-lazy_static! {
-    static ref FORMAT: Regex = Regex::new(r"\[(\d+)-(\d+)-(\d+) (\d+):(\d+)\] \w+ (#(\d+))?").unwrap();
+#[derive(Debug, Default)]
+pub struct Passport {
+    /// (Birth Year)
+    byr: Option<String>,
+    /// (Issue Year)
+    iyr: Option<String>,
+    /// (Expiration Year)
+    eyr: Option<String>,
+    /// (Height)
+    hgt: Option<String>,
+    /// (Hair Color)
+    hcl: Option<String>,
+    /// (Eye Color)
+    ecl: Option<String>,
+    /// (Passport ID)
+    pid: Option<String>,
+    /// (Country ID)
+    cid: Option<String>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct GuardId(u32);
+impl Passport {
+    fn is_valid(&self) -> bool {
+        self.byr.is_some() && self.iyr.is_some() && self.eyr.is_some() && self.hgt.is_some() &&
+        self.hcl.is_some() && self.ecl.is_some() && self.pid.is_some()
+    }
 
-#[derive(Debug)]
-enum UnfinishedRowType {
-    Begin(GuardId),
-    Wake,
-    FallAsleep,
-}
+    fn is_valid_ext(&self) -> bool {
+        if !self.is_valid() {
+            return false;
+        }
 
-pub enum ActionType {
-    Begin,
-    Wake,
-    FallAsleep,
-}
+        let byr = self.byr.as_ref().unwrap().parse::<u16>().unwrap();
 
-#[derive(Debug)]
-struct UnfinishedRow {
-    datetime: NaiveDateTime,
-    row_type: UnfinishedRowType,
-}
+        if byr < 1920 || byr > 2002 {
+            return false;
+        }
 
-pub struct GuardAction {
-    datetime: NaiveDateTime,
-    guard_id: GuardId,
-    action_type: ActionType,
+        let iyr = self.iyr.as_ref().unwrap().parse::<u16>().unwrap();
+
+        if iyr < 2010 || iyr > 2020 {
+            return false;
+        }
+
+        let eyr = self.eyr.as_ref().unwrap().parse::<u16>().unwrap();
+
+        if eyr < 2020 || eyr > 2030 {
+            return false;
+        }
+
+        let hgt = self.hgt.as_ref().unwrap();
+
+        if !hgt.ends_with("in") && !hgt.ends_with("cm") {
+            return false;
+        }
+
+        let hgt_num = hgt[..hgt.len()-2].parse::<u16>().unwrap();
+
+        if hgt.ends_with("in") && (hgt_num < 59 || hgt_num > 76) {
+            return false;
+        }
+
+        if hgt.ends_with("cm") && (hgt_num < 150 || hgt_num > 193) {
+            return false;
+        }
+
+        let hcl = self.hcl.as_ref().unwrap();
+
+        if hcl.len() != 7 || !hcl.starts_with('#') || u32::from_str_radix(&hcl[1..], 16).is_err() {
+            return false;
+        }
+
+        let ecl = self.ecl.as_ref().unwrap();
+
+        dbg!(ecl);
+
+        if !matches!(&**ecl, "amb" | "blu" | "brn" | "gry" | "grn" | "hzl" | "oth") {
+            return false;
+        }
+
+        let pid = self.pid.as_ref().unwrap();
+
+
+
+        if pid.len() != 9 || pid.parse::<u32>().is_err() {
+            return false;
+        }
+
+        true
+    }
 }
 
 #[aoc_generator(day4)]
-pub fn input_generator(input: &str) -> Vec<GuardAction> {
-    let mut unfinished_rows: Vec<_> = FORMAT.captures_iter(input).map(|cap| {
-        let year = cap[1].parse::<i32>().unwrap();
-        let month = cap[2].parse::<u32>().unwrap();
-        let day = cap[3].parse::<u32>().unwrap();
-        let hour = cap[4].parse::<u32>().unwrap();
-        let minute = cap[5].parse::<u32>().unwrap();
-        let guard_num = cap.get(7).map(|m| m.as_str().parse::<u32>().unwrap());
+pub fn input_generator(input: &str) -> Vec<Passport> {
+    let lines = input.split('\n');
 
-        let row_type = if let Some(guard_id) = guard_num {
-            UnfinishedRowType::Begin(GuardId(guard_id))
-        } else if cap[0].ends_with("wakes ") {
-            UnfinishedRowType::Wake
-        } else {
-            UnfinishedRowType::FallAsleep
-        };
+    let mut passports = Vec::new();
+    let mut current_passport = None;
 
-        UnfinishedRow {
-            datetime: NaiveDate::from_ymd(year, month, day).and_hms(hour, minute, 0),
-            row_type,
+    for line in lines {
+        if line.is_empty() {
+            passports.push(current_passport.take().unwrap());
+            continue;
         }
-    }).collect();
 
-    unfinished_rows.sort_by(|row, row2| row.datetime.cmp(&row2.datetime));
+        let mut passport = current_passport.take().unwrap_or_else(Passport::default);
 
-    let mut guard_id = GuardId(0);
+        let key_val_pairs = line.split(' ');
 
-    unfinished_rows.iter()
-        .map(|row| {
-            let action_type = match row.row_type {
-                UnfinishedRowType::Begin(id) => {
-                    guard_id = id;
+        for key_val in key_val_pairs {
+            let mut split = key_val.split(':');
+            let key = split.next().unwrap();
+            let val = Some(split.next().unwrap().to_string());
 
-                    ActionType::Begin
-                },
-                UnfinishedRowType::FallAsleep => ActionType::FallAsleep,
-                UnfinishedRowType::Wake => ActionType::Wake,
-            };
-
-            GuardAction {
-                datetime: row.datetime,
-                guard_id,
-                action_type,
+            match key {
+                "byr" => passport.byr = val,
+                "iyr" => passport.iyr = val,
+                "eyr" => passport.eyr = val,
+                "hgt" => passport.hgt = val,
+                "hcl" => passport.hcl = val,
+                "ecl" => passport.ecl = val,
+                "pid" => passport.pid = val,
+                "cid" => passport.cid = val,
+                _ => unreachable!(),
             }
-        })
-        .collect()
+        }
+
+        current_passport = Some(passport);
+    }
+
+    if let Some(passport) = current_passport.take() {
+        passports.push(passport);
+    }
+
+    passports
 }
 
-fn get_time_and_minutes_asleep(actions: &[GuardAction]) -> (HashMap<GuardId, u32>, HashMap<(GuardId, u32), u32>) {
-    let mut time_asleep = HashMap::new();
-    let mut minutes_asleep = HashMap::new();
-    let mut fell_asleep_at = None;
-
-    for action in actions {
-        match action.action_type {
-            ActionType::FallAsleep => fell_asleep_at = Some(action.datetime),
-            ActionType::Wake => {
-                let time_asleep = time_asleep.entry(action.guard_id).or_insert(0);
-                let diff = action.datetime - fell_asleep_at.unwrap();
-
-                *time_asleep += diff.num_minutes() as u32;
-
-                let start_minute = fell_asleep_at.unwrap().minute();
-                let end_minute = start_minute + diff.num_minutes() as u32;
-
-                for minute in start_minute..end_minute {
-                    let minute = minute % 60;
-                    let minute_asleep = minutes_asleep.entry((action.guard_id, minute)).or_insert(0);
-
-                    *minute_asleep += 1;
-                }
-
-                fell_asleep_at = None;
-            },
-            _ => {},
-        }
-    }
-
-    (time_asleep, minutes_asleep)
+#[aoc(day4, part1)]
+pub fn part1(passports: &[Passport]) -> usize {
+    passports.iter().filter(|p| p.is_valid()).count()
 }
 
-#[aoc(day4, part1, Chars)]
-pub fn part1_chars(actions: &[GuardAction]) -> u32 {
-    let (time_asleep, minutes_asleep) = get_time_and_minutes_asleep(&actions);
-    let mut guard_id = GuardId(0);
-    let mut max_time_asleep = 0;
-
-    for (id, time_asleep) in time_asleep.iter() {
-        if *time_asleep > max_time_asleep {
-            max_time_asleep = *time_asleep;
-            guard_id = *id;
-        }
-    }
-
-    let mut most_asleep_minute = 0;
-    let mut most_time_asleep = 0;
-
-    let minutes_iter = minutes_asleep.iter()
-        .filter(|((id, _), _)| *id == guard_id);
-
-    for ((_, minute), current_time_asleep) in minutes_iter {
-        if *current_time_asleep > most_time_asleep {
-            most_time_asleep = *current_time_asleep;
-            most_asleep_minute = *minute;
-        }
-    }
-
-    guard_id.0 * most_asleep_minute
-}
-
-#[aoc(day4, part2, Chars)]
-pub fn part2_chars(actions: &[GuardAction]) -> u32 {
-    let (_, minutes_asleep) = get_time_and_minutes_asleep(actions);
-    let mut minute = 0;
-    let mut guard_id = GuardId(0);
-    let mut times_asleep = 0;
-
-    for ((id, min), current_times_asleep) in minutes_asleep {
-        if current_times_asleep > times_asleep {
-            guard_id = id;
-            times_asleep = current_times_asleep;
-            minute = min;
-        }
-    }
-
-    guard_id.0 * minute
+#[aoc(day4, part2)]
+pub fn part2(passports: &[Passport]) -> usize {
+    passports.iter().filter(|p| p.is_valid_ext()).count()
 }
