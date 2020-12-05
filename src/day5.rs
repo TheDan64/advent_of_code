@@ -1,62 +1,122 @@
-fn cmp_chars(lhs: char, rhs: char) -> bool {
-    (lhs.is_lowercase() && lhs.to_uppercase().next().unwrap() == rhs) ||
-    (lhs.is_uppercase() && lhs.to_lowercase().next().unwrap() == rhs)
+use std::collections::HashSet;
+use std::convert::Infallible;
+use std::str::FromStr;
+
+use arrayvec::ArrayVec;
+
+#[derive(Clone, Copy)]
+enum FrontBack {
+    Back,
+    Front,
 }
 
-fn react(input: &str) -> String {
-    let mut iter = input.chars().peekable();
-    let mut skip_next = false;
-    let mut output = String::new();
+#[derive(Clone, Copy)]
+enum LeftRight {
+    Left,
+    Right,
+}
 
-    while let Some(ch) = iter.next() {
-        if skip_next {
-            skip_next = false;
-            continue;
-        }
+#[derive(Debug, Eq, Hash, PartialEq)]
+struct Seat {
+    row: usize,
+    column: usize,
+}
 
-        if let Some(next_ch) = iter.peek() {
-            if cmp_chars(ch, *next_ch) {
-                skip_next = true;
-                continue;
+type SeatId = usize;
+
+impl Seat {
+    fn id(&self) -> SeatId {
+        self.row * 8 + self.column
+    }
+}
+
+pub struct BoardingPass {
+    fb: ArrayVec<[FrontBack; 7]>,
+    lr: ArrayVec<[LeftRight; 3]>,
+}
+
+impl BoardingPass {
+    fn seat(&self) -> Seat {
+        let (mut row_min, mut row_max) = (0, 127);
+        let (mut column_min, mut column_max) = (0, 7);
+
+        for fb in &self.fb {
+            match fb {
+                FrontBack::Front => row_max -= (row_max - row_min) / 2 + 1,
+                FrontBack::Back => row_min += (row_max - row_min) / 2 + 1,
             }
         }
 
-        output.push(ch);
-    }
-
-    output
-}
-
-#[aoc(day5, part1, Chars)]
-pub fn part1_chars(input: &str) -> usize {
-    let mut reduced = react(input);
-
-    loop {
-        let next_reduced = react(&reduced);
-
-        if reduced == next_reduced {
-            break reduced.len();
+        for lr in &self.lr {
+            match lr {
+                LeftRight::Left => column_max -= (column_max - column_min) / 2 + 1,
+                LeftRight::Right => column_min += (column_max - column_min) / 2 + 1,
+            }
         }
 
-        reduced = next_reduced;
+        let row = match self.fb[6] {
+            FrontBack::Front => row_min,
+            FrontBack::Back => row_max,
+        };
+        let column = match self.lr[2] {
+            LeftRight::Left => column_min,
+            LeftRight::Right => column_max,
+        };
+
+        Seat { row, column }
     }
 }
 
-#[aoc(day5, part2, Chars)]
-pub fn part2_chars(input: &str) -> usize {
-    let char_iter = "abcdefghijklmnopqrstuvwxyz".chars();
-    let mut smallest = None;
+impl FromStr for BoardingPass {
+    type Err = Infallible;
 
-    for ch in char_iter {
-        let new_input: String = input.chars()
-            .filter(|&chr| chr != ch && chr != ch.to_uppercase().next().unwrap())
-            .collect();
-        let reduced = part1_chars(&new_input);
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let bytes = s.as_bytes();
 
-        if smallest.is_none() || smallest.unwrap() > reduced {
-            smallest = Some(reduced);
+        let fb: ArrayVec<[_; 7]> = bytes[0..7].iter().map(|ch| if *ch == b'F' {
+            FrontBack::Front
+        } else {
+            FrontBack::Back
+        }).collect();
+        let lr: ArrayVec<[_; 3]> = bytes[7..10].iter().map(|ch| if *ch == b'L' {
+            LeftRight::Left
+        } else {
+            LeftRight::Right
+        }).collect();
+
+        assert!(fb.is_full());
+        assert!(lr.is_full());
+
+        Ok(BoardingPass { fb, lr })
+    }
+}
+
+#[aoc_generator(day5)]
+pub fn input_generator(input: &str) -> Vec<BoardingPass> {
+    let lines = input.split('\n').filter(|s| !s.is_empty());
+
+    lines.map(|s| s.parse().unwrap()).collect()
+}
+
+#[aoc(day5, part1)]
+pub fn part1(passes: &[BoardingPass]) -> usize {
+    passes.iter().map(|p| p.seat().id()).max().unwrap_or(0)
+}
+
+#[aoc(day5, part2)]
+pub fn part2(passes: &[BoardingPass]) -> usize {
+    let all_ids: HashSet<_> = (0..=911usize).collect();
+    let present_ids: HashSet<_> = passes.iter().map(|p| p.seat().id()).collect();
+    let remaining_ids: HashSet<_> = all_ids.difference(&present_ids).collect();
+
+    for id in remaining_ids.iter().copied() {
+        let one_less_id = id.checked_sub(1).and_then(|id| remaining_ids.get(&id));
+        let one_more_id = remaining_ids.get(&(*id + 1));
+
+        if one_less_id.is_none() && one_more_id.is_none() {
+            return *id
         }
     }
 
-    smallest.unwrap()
+    unreachable!()
 }
