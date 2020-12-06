@@ -84,9 +84,6 @@ impl FromStr for BoardingPass {
             LeftRight::Right
         }).collect();
 
-        assert!(fb.is_full());
-        assert!(lr.is_full());
-
         Ok(BoardingPass { fb, lr })
     }
 }
