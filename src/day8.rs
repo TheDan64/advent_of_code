@@ -1,125 +1,86 @@
-#[derive(Debug)]
-pub struct Node {
-    children: Vec<Node>,
-    metadata: Vec<usize>,
-}
+use std::collections::HashSet;
 
-fn get_child_node_width(nums: &[usize]) -> usize {
-    if nums.is_empty() {
-        return 0;
-    }
+use Instruction::*;
 
-    let num_children = nums[0];
-    let num_metadata = nums[1];
-    let metadata_start = nums.len() - num_metadata;
-
-    if num_children == 0 {
-        2 + num_metadata
-    } else {
-        let mut total_width = 0;
-
-        for _ in 0..num_children {
-            let children_slice = &nums[total_width + 2..metadata_start];
-            let width = get_child_node_width(children_slice);
-
-            total_width += width;
-        }
-
-        total_width + num_metadata + 2
-    }
-}
-
-fn build_tree(nums: &[usize]) -> Option<Node> {
-    if nums.is_empty() {
-        return None;
-    }
-
-    let num_children = nums[0];
-    let num_metadata = nums[1];
-    let mut node = Node {
-        children: Vec::with_capacity(num_children),
-        metadata: Vec::with_capacity(num_metadata),
-    };
-
-    let metadata_start = nums.len() - num_metadata;
-
-    for metadata in &nums[metadata_start..] {
-        node.metadata.push(*metadata);
-    }
-
-    let children_slice = &nums[2..metadata_start];
-
-    if num_children == 0 {
-        return Some(node);
-    }
-
-    let num_items = children_slice.len() / num_children;
-    let mut start_index = 0;
-
-    for _ in 0..=num_items {
-        let width = get_child_node_width(&children_slice[start_index..]);
-
-        if let Some(child) = build_tree(&children_slice[start_index..start_index + width]) {
-            node.children.push(child);
-        }
-
-        start_index += width;
-    }
-
-    Some(node)
-}
-
-fn visit_nodes<M, R>(node: &Node, map: &M) -> Vec<R>
-where
-    M: Fn(&Node) -> R,
-{
-    let x = map(&node);
-    let mut res = vec![x];
-
-    for child in &node.children {
-        res.append(&mut visit_nodes(&child, map));
-    }
-
-    res
+#[derive(Clone, Copy, Debug)]
+pub enum Instruction {
+    Acc(isize),
+    Jmp(isize),
+    Noop(isize),
 }
 
 #[aoc_generator(day8)]
-pub fn input_generator(input: &str) -> Node {
-    let nums: Vec<usize> = input.split(' ').map(|s| s.parse::<usize>().unwrap()).collect();
+pub fn input_generator(input: &str) -> Vec<Instruction> {
+    let lines = input.split('\n').filter(|s| !s.is_empty());
 
-    build_tree(&nums).expect("Expected to find a tree")
-}
+    lines.map(|s| {
+        let mut split = s.split(' ');
+        let instr = split.next().unwrap();
+        let val = split.next().unwrap().parse::<isize>().unwrap();
 
-fn sum_metadata(node: &Node) -> usize {
-    node.metadata.iter().map(|x| *x).sum()
-}
-
-#[aoc(day8, part1, Chars)]
-pub fn part1_chars(tree: &Node) -> usize {
-    visit_nodes(&tree, &sum_metadata).iter().sum()
-}
-
-fn value_node(node: &Node) -> usize {
-    if node.children.is_empty() {
-        sum_metadata(node)
-    } else {
-        let mut value = 0;
-
-        for metadata in &node.metadata {
-            let index = metadata - 1;
-            let child = node.children.get(index);
-
-            if let Some(child) = child {
-                let val = value_node(&child);
-                value += val;
-            }
+        match instr {
+            "acc" => Acc(val),
+            "jmp" => Jmp(val),
+            "nop" => Noop(val),
+            _ => unreachable!(),
         }
 
-        value
-    }
+    }).collect()
 }
 
-#[aoc(day8, part2, Chars)]
-pub fn part2_chars(tree: &Node) -> usize {
-    *visit_nodes(&tree, &value_node).iter().next().unwrap()
+fn get_final_acc(instructions: &[Instruction]) -> Result<isize, isize> {
+    let mut i = 0;
+    let mut acc = 0;
+    let mut visited_instruction = HashSet::with_capacity(instructions.len());
+
+    while i < instructions.len() {
+        if visited_instruction.get(&i).is_some() {
+            return Err(acc);
+        }
+
+        visited_instruction.insert(i);
+
+        match instructions[i] {
+            Acc(val) => acc += val,
+            Jmp(val) => {
+                i = ((i as isize) + val) as usize;
+                continue;
+            },
+            Noop(_val) => {},
+        }
+
+        i += 1;
+    }
+
+    Ok(acc)
+}
+
+#[aoc(day8, part1)]
+pub fn part1(instructions: &[Instruction]) -> isize {
+    get_final_acc(instructions).unwrap_err()
+}
+
+fn swap(instr: &mut Instruction) {
+    *instr = match instr {
+        Acc(val) => Acc(*val),
+        Jmp(val) => Noop(*val),
+        Noop(val) => Jmp(*val),
+    };
+}
+
+#[aoc(day8, part2)]
+pub fn part2(instructions: &[Instruction]) -> isize {
+    let mut instructions: Vec<_> = instructions.iter().copied().collect();
+
+    for i in 0..instructions.len() {
+        swap(&mut instructions[i]);
+
+        if let Ok(acc) = get_final_acc(&instructions) {
+            return acc;
+        }
+
+        swap(&mut instructions[i]);
+    }
+
+    unreachable!()
 }
