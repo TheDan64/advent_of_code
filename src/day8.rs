@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::collections::HashSet;
 
 use Instruction::*;
@@ -10,7 +11,7 @@ pub enum Instruction {
 }
 
 #[aoc_generator(day8)]
-pub fn input_generator(input: &str) -> Vec<Instruction> {
+pub fn input_generator(input: &str) -> Vec<Cell<Instruction>> {
     let lines = input.split('\n').filter(|s| !s.is_empty());
 
     lines.map(|s| {
@@ -19,16 +20,16 @@ pub fn input_generator(input: &str) -> Vec<Instruction> {
         let val = split.next().unwrap().parse::<isize>().unwrap();
 
         match instr {
-            "acc" => Acc(val),
-            "jmp" => Jmp(val),
-            "nop" => Noop(val),
+            "acc" => Cell::new(Acc(val)),
+            "jmp" => Cell::new(Jmp(val)),
+            "nop" => Cell::new(Noop(val)),
             _ => unreachable!(),
         }
 
     }).collect()
 }
 
-fn get_final_acc(instructions: &[Instruction]) -> Result<isize, isize> {
+fn get_final_acc(instructions: &[Cell<Instruction>]) -> Result<isize, isize> {
     let mut i = 0;
     let mut acc = 0;
     let mut visited_instruction = HashSet::with_capacity(instructions.len());
@@ -40,7 +41,7 @@ fn get_final_acc(instructions: &[Instruction]) -> Result<isize, isize> {
 
         visited_instruction.insert(i);
 
-        match instructions[i] {
+        match instructions[i].get() {
             Acc(val) => acc += val,
             Jmp(val) => {
                 i = ((i as isize) + val) as usize;
@@ -56,30 +57,28 @@ fn get_final_acc(instructions: &[Instruction]) -> Result<isize, isize> {
 }
 
 #[aoc(day8, part1)]
-pub fn part1(instructions: &[Instruction]) -> isize {
+pub fn part1(instructions: &[Cell<Instruction>]) -> isize {
     get_final_acc(instructions).unwrap_err()
 }
 
-fn swap(instr: &mut Instruction) {
-    *instr = match instr {
-        Acc(val) => Acc(*val),
-        Jmp(val) => Noop(*val),
-        Noop(val) => Jmp(*val),
-    };
+fn swap(instr: &Cell<Instruction>) {
+    instr.set(match instr.get() {
+        Acc(val) => Acc(val),
+        Jmp(val) => Noop(val),
+        Noop(val) => Jmp(val),
+    });
 }
 
 #[aoc(day8, part2)]
-pub fn part2(instructions: &[Instruction]) -> isize {
-    let mut instructions: Vec<_> = instructions.iter().copied().collect();
-
+pub fn part2(instructions: &[Cell<Instruction>]) -> isize {
     for i in 0..instructions.len() {
-        swap(&mut instructions[i]);
+        swap(&instructions[i]);
 
         if let Ok(acc) = get_final_acc(&instructions) {
             return acc;
         }
 
-        swap(&mut instructions[i]);
+        swap(&instructions[i]);
     }
 
     unreachable!()
