@@ -1,52 +1,42 @@
-extern crate ring_queue;
-
-use std::collections::HashMap;
-
-use ring_queue::Ring;
+use std::collections::HashSet;
 
 #[aoc_generator(day9)]
-pub fn input_generator(input: &str) -> (usize, usize) {
-    let mut nums = input.split(' ');
-    let players = nums.next().unwrap().parse::<usize>().unwrap();
-    let last_marble_points = nums.nth(5).unwrap().parse::<usize>().unwrap();
-
-    (players, last_marble_points)
+pub fn input_generator(input: &str) -> Vec<u64> {
+    input.split('\n').filter(|s| !s.is_empty()).map(|s| s.parse().unwrap()).collect()
 }
 
-#[aoc(day9, part1, Chars)]
-pub fn part1_chars(&(players, last_marble_points): &(usize, usize)) -> usize {
-    let mut player_scores = HashMap::with_capacity(players);
-    let mut marbles = Ring::with_capacity(last_marble_points);
+#[aoc(day9, part1)]
+pub fn part1(nums: &[u64]) -> u64 {
+    const PREAMBLE: usize = 25;
 
-    marbles.push(0);
+    let mut set: HashSet<_> = nums.iter().copied().take(PREAMBLE).collect();
 
-    for i in 1..=last_marble_points {
-        let player_id = (i - 1) % players + 1;
-        let player_score = player_scores.entry(player_id).or_insert(0);
-
-        if i % 23 == 0 {
-            marbles.rotate(7);
-
-            *player_score += i + marbles.pop().unwrap();
-
-            marbles.rotate(-1);
-
-            continue;
+    'outer: for (i, num) in nums.iter().copied().skip(PREAMBLE).enumerate() {
+        for item in nums[i..i + PREAMBLE].iter().copied() {
+            if set.get(&(num - item)).is_some() {
+                set.remove(&nums[i]);
+                set.insert(num);
+                continue 'outer;
+            }
         }
 
-        marbles.rotate(-1);
-        marbles.push(i);
+        return nums[i + PREAMBLE];
     }
 
-    *player_scores.values().max().unwrap_or(&0)
+    unreachable!()
 }
 
-#[aoc(day9, part2, Chars)]
-pub fn part2_chars(values: &(usize, usize)) -> usize {
-    let &(players, mut last_marble_points) = values;
+#[aoc(day9, part2)]
+pub fn part2(nums: &[u64]) -> u64 {
+    let p1 = part1(nums);
 
-    last_marble_points *= 100;
+    for i in 0..nums.len() {
+        for j in i+1..nums.len() {
+            if nums[i..=j].iter().copied().sum::<u64>() == p1 {
+                return nums[i..=j].iter().min().unwrap() + nums[i..=j].iter().max().unwrap();
+            }
+        }
+    }
 
-    // ~0.45s to go through 7197500 marbles!
-    part1_chars(&(players, last_marble_points))
+    unreachable!()
 }
