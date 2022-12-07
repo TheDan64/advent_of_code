@@ -1,92 +1,116 @@
-use std::collections::HashMap;
+use aoc_runner_derive::aoc;
+use std::cmp::Ordering::{self, *};
+use RPS::*;
 
-#[derive(Debug)]
-pub struct Counter(HashMap<char, usize>);
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RPS {
+    Rock,
+    Paper,
+    Scissors,
+}
 
-impl Counter {
-    fn new(s: &str) -> Self {
-        let mut counter = Counter(HashMap::new());
-
-        for ch in s.chars() {
-            counter.add_char(ch);
+impl RPS {
+    fn score(&self) -> u32 {
+        match self {
+            Self::Rock => 1,
+            Self::Paper => 2,
+            Self::Scissors => 3,
         }
-
-        counter
-    }
-
-    fn add_char(&mut self, ch: char) {
-        let entry = self.0.entry(ch).or_insert(0);
-
-        *entry += 1;
-    }
-
-    fn get(&self, ch: char) -> usize {
-        *self.0.get(&ch).unwrap_or(&0)
     }
 }
 
-#[derive(Debug)]
-pub struct Policy {
-    min: usize,
-    max: usize,
-    ch: char,
+impl Ord for RPS {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Rock, Rock) | (Paper, Paper) | (Scissors, Scissors) => Equal,
+            (Rock, Scissors) | (Paper, Rock) | (Scissors, Paper) => Greater,
+            (Rock, Paper) | (Paper, Scissors) | (Scissors, Rock) => Less,
+        }
+    }
 }
 
-#[aoc_generator(day2)]
-pub fn input_generator(input: &str) -> Vec<(Policy, String)> {
-    input
-        .split('\n')
-        .filter(|s| !s.is_empty())
-        .map(|s| {
-            let mut split = s.split(": ");
-            let policy = split.next().unwrap();
-            let password = split.next().unwrap();
+impl PartialOrd for RPS {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
-            let mut split = policy.split(' ');
-            let range = split.next().unwrap();
-            let ch = split.next().unwrap().chars().next().unwrap();
+enum XYZ {
+    X,
+    Y,
+    Z,
+}
 
-            let mut split = range.split('-');
-            let min = split.next().unwrap().parse().unwrap();
-            let max = split.next().unwrap().parse().unwrap();
-            let policy = Policy { min, max, ch };
+impl From<XYZ> for RPS {
+    fn from(xyz: XYZ) -> Self {
+        match xyz {
+            XYZ::X => Rock,
+            XYZ::Y => Paper,
+            XYZ::Z => Scissors,
+        }
+    }
+}
 
-            // Calls to_string since cargo-aoc doesn't support lifetimes in
-            // generator output :(
-            (policy, password.to_string())
-        })
-        .collect()
+impl From<XYZ> for Ordering {
+    fn from(xyz: XYZ) -> Self {
+        match xyz {
+            XYZ::X => Greater,
+            XYZ::Y => Equal,
+            XYZ::Z => Less,
+        }
+    }
+}
+
+fn rounds<'s>(input: &'s str) -> impl Iterator<Item = (RPS, XYZ)> + 's {
+    input.split('\n').map(|round| {
+        let (left, right) = round.split_once(' ').unwrap();
+        let left = match left {
+            "A" => Rock,
+            "B" => Paper,
+            "C" => Scissors,
+            _ => unreachable!(),
+        };
+        let right = match right {
+            "X" => XYZ::X,
+            "Y" => XYZ::Y,
+            "Z" => XYZ::Z,
+            _ => unreachable!(),
+        };
+
+        (left, right)
+    })
+}
+
+fn score(left: RPS, right: RPS) -> u32 {
+    if right > left {
+        6 + right.score()
+    } else if right == left {
+        3 + right.score()
+    } else {
+        right.score()
+    }
 }
 
 #[aoc(day2, part1)]
-pub fn part1(input: &[(Policy, String)]) -> usize {
-    let mut valid = 0;
-
-    for (policy, password) in input {
-        let counter = Counter::new(&password);
-        let count = counter.get(policy.ch);
-
-        if count >= policy.min && count <= policy.max {
-            valid += 1;
-        }
-    }
-
-    valid
+pub fn part1(input: &str) -> u32 {
+    rounds(input)
+        .map(|(left, right)| score(left, RPS::from(right)))
+        .sum()
 }
 
 #[aoc(day2, part2)]
-pub fn part2(input: &[(Policy, String)]) -> usize {
-    let mut valid = 0;
+pub fn part2(input: &str) -> u32 {
+    rounds(input)
+        .map(|(left, right)| {
+            let result = Ordering::from(right);
 
-    for (policy, password) in input {
-        let password = password.as_bytes();
-        let first = password[policy.min - 1] == policy.ch as u8;
-        let second = password[policy.max - 1] == policy.ch as u8;
+            for hand in [Rock, Paper, Scissors] {
+                if left.cmp(&hand) == result {
+                    return score(left, hand);
+                }
+            }
 
-        if first ^ second {
-            valid += 1;
-        }
-    }
-
-    valid
+            unreachable!()
+        })
+        .sum()
 }
