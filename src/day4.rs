@@ -1,141 +1,51 @@
-#[derive(Debug, Default)]
-pub struct Passport {
-    /// (Birth Year)
-    byr: Option<String>,
-    /// (Issue Year)
-    iyr: Option<String>,
-    /// (Expiration Year)
-    eyr: Option<String>,
-    /// (Height)
-    hgt: Option<String>,
-    /// (Hair Color)
-    hcl: Option<String>,
-    /// (Eye Color)
-    ecl: Option<String>,
-    /// (Passport ID)
-    pid: Option<String>,
-    /// (Country ID)
-    cid: Option<String>,
-}
+use aoc_runner_derive::aoc;
 
-impl Passport {
-    fn is_valid(&self) -> bool {
-        self.byr.is_some() && self.iyr.is_some() && self.eyr.is_some() && self.hgt.is_some() &&
-        self.hcl.is_some() && self.ecl.is_some() && self.pid.is_some()
-    }
+fn pairs<'s>(input: &'s str) -> impl Iterator<Item = ((u8, u8), (u8, u8))> + 's {
+    input.split('\n').map(|line| {
+        let (left, right) = line.split_once(',').unwrap();
+        let (lstart, lend) = left.split_once('-').unwrap();
+        let (rstart, rend) = right.split_once('-').unwrap();
+        let lstart = lstart.parse::<u8>().unwrap();
+        let lend = lend.parse::<u8>().unwrap();
+        let rstart = rstart.parse::<u8>().unwrap();
+        let rend = rend.parse::<u8>().unwrap();
 
-    fn is_valid_ext(&self) -> bool {
-        if !self.is_valid() {
-            return false;
-        }
-
-        let byr = self.byr.as_ref().unwrap().parse::<u16>().unwrap();
-
-        if byr < 1920 || byr > 2002 {
-            return false;
-        }
-
-        let iyr = self.iyr.as_ref().unwrap().parse::<u16>().unwrap();
-
-        if iyr < 2010 || iyr > 2020 {
-            return false;
-        }
-
-        let eyr = self.eyr.as_ref().unwrap().parse::<u16>().unwrap();
-
-        if eyr < 2020 || eyr > 2030 {
-            return false;
-        }
-
-        let hgt = self.hgt.as_ref().unwrap();
-
-        if !hgt.ends_with("in") && !hgt.ends_with("cm") {
-            return false;
-        }
-
-        let hgt_num = hgt[..hgt.len()-2].parse::<u16>().unwrap();
-
-        if hgt.ends_with("in") && (hgt_num < 59 || hgt_num > 76) {
-            return false;
-        }
-
-        if hgt.ends_with("cm") && (hgt_num < 150 || hgt_num > 193) {
-            return false;
-        }
-
-        let hcl = self.hcl.as_ref().unwrap();
-
-        if hcl.len() != 7 || !hcl.starts_with('#') || u32::from_str_radix(&hcl[1..], 16).is_err() {
-            return false;
-        }
-
-        let ecl = self.ecl.as_ref().unwrap();
-
-        if !matches!(&**ecl, "amb" | "blu" | "brn" | "gry" | "grn" | "hzl" | "oth") {
-            return false;
-        }
-
-        let pid = self.pid.as_ref().unwrap();
-
-        if pid.len() != 9 || pid.parse::<u32>().is_err() {
-            return false;
-        }
-
-        true
-    }
-}
-
-#[aoc_generator(day4)]
-pub fn input_generator(input: &str) -> Vec<Passport> {
-    let lines = input.split('\n');
-
-    let mut passports = Vec::new();
-    let mut current_passport = None;
-
-    for line in lines {
-        if line.is_empty() {
-            passports.push(current_passport.take().unwrap());
-            continue;
-        }
-
-        let mut passport = current_passport.take().unwrap_or_else(Passport::default);
-
-        let key_val_pairs = line.split(' ');
-
-        for key_val in key_val_pairs {
-            let mut split = key_val.split(':');
-            let key = split.next().unwrap();
-            let val = Some(split.next().unwrap().to_string());
-
-            match key {
-                "byr" => passport.byr = val,
-                "iyr" => passport.iyr = val,
-                "eyr" => passport.eyr = val,
-                "hgt" => passport.hgt = val,
-                "hcl" => passport.hcl = val,
-                "ecl" => passport.ecl = val,
-                "pid" => passport.pid = val,
-                "cid" => passport.cid = val,
-                _ => unreachable!(),
-            }
-        }
-
-        current_passport = Some(passport);
-    }
-
-    if let Some(passport) = current_passport.take() {
-        passports.push(passport);
-    }
-
-    passports
+        ((lstart, lend), (rstart, rend))
+    })
 }
 
 #[aoc(day4, part1)]
-pub fn part1(passports: &[Passport]) -> usize {
-    passports.iter().filter(|p| p.is_valid()).count()
+pub fn part1(input: &str) -> u64 {
+    pairs(input)
+        .map(|(left, right)| {
+            if (left.0 >= right.0 && left.1 <= right.1) || (right.0 >= left.0 && right.1 <= left.1)
+            {
+                1
+            } else {
+                0
+            }
+        })
+        .sum::<u64>()
+}
+
+fn overlap(min1: u8, max1: u8, min2: u8, max2: u8) -> u8 {
+    0.max(match max1.min(max2).checked_sub(min1.max(min2)) {
+        Some(val) => val + 1,
+        None => 0,
+    })
 }
 
 #[aoc(day4, part2)]
-pub fn part2(passports: &[Passport]) -> usize {
-    passports.iter().filter(|p| p.is_valid_ext()).count()
+pub fn part2(input: &str) -> u64 {
+    pairs(input)
+        .map(|(left, right)| {
+            let overlap = overlap(left.0, left.1, right.0, right.1);
+
+            if overlap > 0 {
+                1
+            } else {
+                0
+            }
+        })
+        .sum::<u64>()
 }

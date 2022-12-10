@@ -1,63 +1,49 @@
-struct Position {
-    x: usize,
-    y: usize,
+use std::collections::HashSet;
+use std::iter::FromIterator;
+
+use aoc_runner_derive::aoc;
+use itertools::Itertools;
+
+fn compartments<'s>(input: &'s str) -> impl Iterator<Item = (HashSet<char>, HashSet<char>)> + 's {
+    input.split('\n').map(|rucksack| {
+        let (left, right) = rucksack.split_at(rucksack.len() / 2);
+        (
+            HashSet::from_iter(left.chars()),
+            HashSet::from_iter(right.chars()),
+        )
+    })
 }
 
-struct Slope {
-    right: usize,
-    down: usize,
-}
-
-#[aoc_generator(day3)]
-pub fn input_generator(input: &str) -> Vec<Vec<u8>> {
-    input
-        .split('\n')
-        .filter(|s| !s.is_empty())
-        .map(|s| s.as_bytes())
-        .map(ToOwned::to_owned)
-        .collect()
-}
-
-fn calc_trees_hit(slope: &Slope, rows: &[Vec<u8>]) -> usize {
-    let mut trees_hit = 0;
-    let mut pos = Position { x: 0, y: 0 };
-    let map_width = rows[0].len();
-    let map_height = rows.len();
-
-    while pos.y < map_height {
-        pos.x += slope.right;
-        pos.y += slope.down;
-
-        if pos.y >= map_height {
-            break;
-        }
-
-        if pos.x >= map_width {
-            pos.x -= map_width;
-        }
-
-        if rows[pos.y][pos.x] == b'#' {
-            trees_hit += 1;
-        }
+fn score(ch: &char) -> u64 {
+    match ch {
+        'a'..='z' => *ch as u64 - 96,
+        'A'..='Z' => *ch as u64 - 38,
+        _ => unreachable!(),
     }
-
-    trees_hit
 }
 
 #[aoc(day3, part1)]
-pub fn part1(rows: &[Vec<u8>]) -> usize {
-    calc_trees_hit(&Slope { right: 3, down: 1 }, rows)
+pub fn part1(input: &str) -> u64 {
+    compartments(input)
+        .map(|(left, right)| left.intersection(&right).map(score).sum::<u64>())
+        .sum()
 }
 
 #[aoc(day3, part2)]
-pub fn part2(rows: &[Vec<u8>]) -> usize {
-    let slopes = [
-        Slope { right: 1, down: 1 },
-        Slope { right: 3, down: 1 },
-        Slope { right: 5, down: 1 },
-        Slope { right: 7, down: 1 },
-        Slope { right: 1, down: 2 },
-    ];
-
-    slopes.iter().map(|slope| calc_trees_hit(slope, rows)).product()
+pub fn part2(input: &str) -> u64 {
+    compartments(input)
+        .chunks(3)
+        .into_iter()
+        .map(|group| {
+            let mut sets = group.map(|(s1, s2)| &s1 | &s2);
+            sets.next()
+                .map(|set| {
+                    sets.fold(set, |set1, set2| &set1 & &set2)
+                        .iter()
+                        .map(score)
+                        .sum::<u64>()
+                })
+                .unwrap()
+        })
+        .sum()
 }
