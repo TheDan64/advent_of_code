@@ -1,65 +1,27 @@
+use aoc_runner_derive::aoc;
 use std::collections::HashSet;
+use std::iter::FromIterator;
+
+fn split_at_start_of_packet(input: &str, distinct: usize) -> (&str, &str) {
+    for (i, _ch) in input.chars().enumerate() {
+        let s = &input[i..i + distinct];
+
+        if HashSet::<char>::from_iter(s.chars()).len() == distinct {
+            return input.split_at(i + distinct);
+        }
+    }
+
+    unreachable!()
+}
 
 #[aoc(day6, part1)]
 pub fn part1(input: &str) -> usize {
-    let lines = input.split('\n');
-    let mut sum = 0;
-    let mut set = HashSet::new();
-
-    for line in lines {
-        if line.is_empty() {
-            sum += set.len();
-            set.clear();
-            continue;
-        }
-
-        for ch in line.chars() {
-            set.insert(ch);
-        }
-    }
-
-    if !set.is_empty() {
-        sum += set.len();
-    }
-
-    sum
+    split_at_start_of_packet(input, 4).0.len()
 }
 
 #[aoc(day6, part2)]
 pub fn part2(input: &str) -> usize {
-    let lines = input.split('\n');
-    let mut sum = 0;
-    let mut set = HashSet::new();
-    let mut group_start = true;
-
-    for line in lines {
-        if line.is_empty() {
-            sum += set.len();
-            set.clear();
-            group_start = true;
-            continue;
-        }
-
-        let mut local_set = HashSet::new();
-
-        for ch in line.chars() {
-            if group_start {
-                set.insert(ch);
-            } else {
-                local_set.insert(ch);
-            }
-        }
-
-        if !group_start {
-            set = set.intersection(&local_set).copied().collect();
-        }
-
-        group_start = false;
-    }
-
-    if !set.is_empty() {
-        sum += set.len();
-    }
-
-    sum
+    let (start, end) = split_at_start_of_packet(input, 4);
+    let (marker, _) = split_at_start_of_packet(end, 14);
+    start.len() + marker.len()
 }
