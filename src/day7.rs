@@ -1,137 +1,118 @@
 use std::collections::{HashMap, HashSet};
-use std::fmt::{Display, Formatter, self};
+use std::path::{Path, PathBuf};
 
-use lazy_static::lazy_static;
-use regex::Regex;
+use aoc_runner_derive::aoc;
 
-lazy_static! {
-    static ref FORMAT: Regex = Regex::new(r"Step (\w) must be finished before step (\w) can begin.").unwrap();
+enum Cmd<'s> {
+    Cd(&'s str),
+    Ls,
 }
 
-#[aoc_generator(day7)]
-pub fn input_generator(input: &str) -> HashMap<char, Vec<char>> {
-    let mut before_steps = HashMap::new();
-
-    for cap in FORMAT.captures_iter(input) {
-        let step = cap[1].chars().next().unwrap();
-        let before_step = cap[2].chars().next().unwrap();
-        let entry = before_steps.entry(before_step).or_insert_with(Vec::new);
-
-        entry.push(step);
-    }
-
-    before_steps
+enum Line<'s> {
+    Cmd(Cmd<'s>),
+    Dir(&'s str),
+    File(&'s str, u32),
 }
 
-static CHARS: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+struct Directory<'s> {
+    dirs: Vec<&'s str>,
+    files: Vec<(&'s str, u32)>,
+}
 
-fn apply_to_options<F>(steps: &HashMap<char, Vec<char>>, mut f: F)
-where
-    F: FnMut(&[char], &mut HashSet<char>),
-{
-    let mut executed_steps = HashSet::<char>::new();
-    let mut options = Vec::new();
+fn filesystem<'s>(input: &'s str) -> HashMap<PathBuf, Directory<'s>> {
+    let terminal = input.split('\n').map(|line| {
+        if let Some((_, path)) = line.split_once("$ cd ") {
+            Line::Cmd(Cmd::Cd(path))
+        } else if line.starts_with("$ ls") {
+            Line::Cmd(Cmd::Ls)
+        } else if let Some((_, dir_name)) = line.split_once("dir ") {
+            Line::Dir(dir_name)
+        } else {
+            let (file_size, file_name) = line.split_once(' ').unwrap();
+            let file_size = file_size.parse::<u32>().unwrap();
 
-    loop {
-        options.clear();
+            Line::File(file_name, file_size)
+        }
+    });
 
-        for ch in CHARS.chars() {
-            if !executed_steps.contains(&ch) && !steps.get(&ch).is_some() {
-                options.push(ch);
-            }
+    let mut filesystem = HashMap::new();
+    let mut path = PathBuf::new();
 
-            if !executed_steps.contains(&ch) {
-                if let Some(steps) = steps.get(&ch) {
-                    if steps.iter().all(|ch2| executed_steps.contains(ch2)) {
-                        options.push(ch);
-                    }
+    for line in terminal {
+        match line {
+            Line::Cmd(Cmd::Cd(dir)) => {
+                if dir == ".." {
+                    assert!(path.pop());
+                    continue;
                 }
+
+                path.push(dir);
+                assert!(filesystem
+                    .insert(
+                        path.clone(),
+                        Directory {
+                            dirs: Vec::new(),
+                            files: Vec::new(),
+                        }
+                    )
+                    .is_none());
+            }
+            Line::Cmd(Cmd::Ls) => {} // No-op
+            Line::Dir(name) => {
+                filesystem.get_mut(&path).unwrap().dirs.push(name);
+            }
+            Line::File(name, size) => {
+                filesystem.get_mut(&path).unwrap().files.push((name, size));
             }
         }
-
-        options.sort();
-
-        f(&options, &mut executed_steps);
-
-        if executed_steps.len() == CHARS.len() {
-            break;
-        }
     }
+
+    filesystem
+}
+
+fn recurse<F: FnMut(u32)>(fs: &HashMap<PathBuf, Directory<'_>>, path: &Path, f: &mut F) -> u32 {
+    let dir = &fs[path];
+    let mut size = 0;
+
+    for dir_name in &dir.dirs {
+        let path = path.join(dir_name);
+        let sub_size = recurse(fs, &path, f);
+
+        size += sub_size;
+    }
+
+    for (_file_name, sub_size) in &dir.files {
+        size += sub_size;
+    }
+
+    f(size);
+
+    size
 }
 
 #[aoc(day7, part1, Chars)]
-pub fn part1_chars(steps: &HashMap<char, Vec<char>>) -> String {
-    let mut steps_string = String::new();
-
-    apply_to_options(steps, |options, executed_steps| {
-        for ch in options.iter() {
-            if !executed_steps.contains(ch) {
-                executed_steps.insert(*ch);
-                steps_string.push(*ch);
-                break;
-            }
+pub fn part1_chars(input: &str) -> u32 {
+    let fs = filesystem(input);
+    let mut total = 0;
+    recurse(&fs, Path::new("/"), &mut |size| {
+        if size <= 100_000 {
+            total += size;
         }
     });
-
-    steps_string
-}
-
-const MAX_WORKERS: usize = 5;
-
-#[derive(Debug)]
-pub struct TimeAndSteps(u64, String);
-
-impl Display for TimeAndSteps {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "({}, {})", self.0, self.1)
-    }
+    total
 }
 
 #[aoc(day7, part2, Chars)]
-pub fn part2_chars(steps: &HashMap<char, Vec<char>>) -> TimeAndSteps {
-    let mut steps_string = String::new();
-    let mut workers: [Option<(char, u8)>; MAX_WORKERS] = [None; MAX_WORKERS];
-    let mut total_seconds = 0;
-
-    apply_to_options(steps, |options, executed_steps| {
-        total_seconds += 1;
-
-        for ch in options.iter() {
-            let check_opt_char = |opt: &Option<(char, u8)>| {
-                if let Some(work) = opt {
-                    work.0 == *ch
-                } else {
-                    false
-                }
-            };
-
-            if let Some(existing_slot) = workers.iter().position(check_opt_char) {
-                let worker = &mut workers[existing_slot];
-                let timer = &mut worker.as_mut().unwrap().1;
-
-                *timer -= 1;
-
-                continue;
-            }
-
-            if let Some(free_slot) = workers.iter().position(|w| w.is_none()) {
-                let timer = *ch as u8 - 5;
-                let worker = &mut workers[free_slot];
-
-                *worker = Some((*ch, timer))
-            }
-        }
-
-        for opt_worker in workers.iter_mut() {
-            if let Some(worker) = opt_worker {
-                if worker.1 == 0 {
-                    executed_steps.insert(worker.0);
-                    steps_string.push(worker.0);
-                    *opt_worker = None;
-                }
-            }
+pub fn part2_chars(input: &str) -> u32 {
+    let fs = filesystem(input);
+    let mut perfect_size = u32::MAX;
+    let total_size = recurse(&fs, Path::new("/"), &mut |_| {});
+    let free_space = 70000000 - total_size;
+    recurse(&fs, Path::new("/"), &mut |size| {
+        if size + free_space >= 30000000 && size < perfect_size {
+            perfect_size = size;
         }
     });
 
-    TimeAndSteps(total_seconds, steps_string)
+    perfect_size
 }
