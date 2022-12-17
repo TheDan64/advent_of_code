@@ -1,85 +1,169 @@
-use std::cell::Cell;
-use std::collections::HashSet;
+use aoc_runner_derive::aoc;
 
-use Instruction::*;
+fn is_visible(map: &[&str], coord: (usize, usize), n_rows: usize, n_columns: usize) -> bool {
+    let (x, y) = coord;
+    let val = map[y].as_bytes()[x];
 
-#[derive(Clone, Copy, Debug)]
-pub enum Instruction {
-    Acc(isize),
-    Jmp(isize),
-    Noop(isize),
-}
-
-#[aoc_generator(day8)]
-pub fn input_generator(input: &str) -> Vec<Cell<Instruction>> {
-    let lines = input.split('\n').filter(|s| !s.is_empty());
-
-    lines.map(|s| {
-        let mut split = s.split(' ');
-        let instr = split.next().unwrap();
-        let val = split.next().unwrap().parse::<isize>().unwrap();
-
-        match instr {
-            "acc" => Cell::new(Acc(val)),
-            "jmp" => Cell::new(Jmp(val)),
-            "nop" => Cell::new(Noop(val)),
-            _ => unreachable!(),
-        }
-
-    }).collect()
-}
-
-fn get_final_acc(instructions: &[Cell<Instruction>]) -> Result<isize, isize> {
-    let mut i = 0;
-    let mut acc = 0;
-    let mut visited_instruction = HashSet::with_capacity(instructions.len());
-
-    while i < instructions.len() {
-        if visited_instruction.get(&i).is_some() {
-            return Err(acc);
-        }
-
-        visited_instruction.insert(i);
-
-        match instructions[i].get() {
-            Acc(val) => acc += val,
-            Jmp(val) => {
-                i = ((i as isize) + val) as usize;
-                continue;
-            },
-            Noop(_val) => {},
-        }
-
-        i += 1;
+    if x == 0 || y == 0 || x == n_columns - 1 || y == n_rows - 1 {
+        return true;
     }
 
-    Ok(acc)
+    if (0..x)
+        .into_iter()
+        .all(|new_x| map[y].as_bytes()[new_x] < val)
+    {
+        return true;
+    }
+
+    if (0..y)
+        .into_iter()
+        .all(|new_y| map[new_y].as_bytes()[x] < val)
+    {
+        return true;
+    }
+
+    if (x + 1..n_columns)
+        .into_iter()
+        .all(|new_x| map[y].as_bytes()[new_x] < val)
+    {
+        return true;
+    }
+
+    if (y + 1..n_rows)
+        .into_iter()
+        .all(|new_y| map[new_y].as_bytes()[x] < val)
+    {
+        return true;
+    }
+
+    false
 }
 
 #[aoc(day8, part1)]
-pub fn part1(instructions: &[Cell<Instruction>]) -> isize {
-    get_final_acc(instructions).unwrap_err()
+pub fn part1(input: &str) -> u64 {
+    let rows: Vec<_> = input.split('\n').collect();
+    let n_rows = rows.len();
+    let n_columns = rows[0].len();
+    let mut visible = 0;
+
+    for x in 0..n_rows {
+        for y in 0..n_columns {
+            if is_visible(&rows, (x, y), n_rows, n_columns) {
+                visible += 1;
+            }
+        }
+    }
+
+    visible
 }
 
-fn swap(instr: &Cell<Instruction>) {
-    instr.set(match instr.get() {
-        Acc(val) => Acc(val),
-        Jmp(val) => Noop(val),
-        Noop(val) => Jmp(val),
-    });
+#[must_use = "iterator adaptors are lazy and do nothing unless consumed"]
+pub struct TakeWhileInclusive<'a, I: 'a, F> {
+    iter: &'a mut I,
+    predicate: F,
+    done: bool,
+}
+
+impl<'a, I, F> TakeWhileInclusive<'a, I, F>
+where
+    I: Iterator,
+    F: FnMut(&I::Item) -> bool,
+{
+    /// Create a new [`TakeWhileInclusive`] from an iterator and a predicate.
+    pub fn new(iter: &'a mut I, predicate: F) -> Self {
+        Self {
+            iter,
+            predicate,
+            done: false,
+        }
+    }
+}
+
+impl<'a, I, F> Iterator for TakeWhileInclusive<'a, I, F>
+where
+    I: Iterator,
+    F: FnMut(&I::Item) -> bool,
+{
+    type Item = I::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            None
+        } else {
+            self.iter.next().map(|item| {
+                if !(self.predicate)(&item) {
+                    self.done = true;
+                }
+                item
+            })
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.done {
+            (0, Some(0))
+        } else {
+            (0, self.iter.size_hint().1)
+        }
+    }
+}
+
+fn score(map: &[&str], coord: (usize, usize), n_rows: usize, n_columns: usize) -> usize {
+    let (x, y) = coord;
+    let val = map[y].as_bytes()[x];
+
+    if x == 0 || y == 0 || x == n_columns - 1 || y == n_rows - 1 {
+        return 0;
+    }
+
+    let mut score = 1;
+
+    let count = TakeWhileInclusive::new(&mut (0..x).into_iter().rev(), |&new_x| {
+        map[y].as_bytes()[new_x] < val
+    })
+    .count();
+
+    score *= count;
+
+    let count = TakeWhileInclusive::new(&mut (0..y).into_iter().rev(), |&new_y| {
+        map[new_y].as_bytes()[x] < val
+    })
+    .count();
+
+    score *= count;
+
+    let count = TakeWhileInclusive::new(&mut (x + 1..n_columns).into_iter(), |&new_x| {
+        map[y].as_bytes()[new_x] < val
+    })
+    .count();
+
+    score *= count;
+
+    let count = TakeWhileInclusive::new(&mut (y + 1..n_rows).into_iter(), |&new_y| {
+        map[new_y].as_bytes()[x] < val
+    })
+    .count();
+
+    score *= count;
+    score
 }
 
 #[aoc(day8, part2)]
-pub fn part2(instructions: &[Cell<Instruction>]) -> isize {
-    for i in 0..instructions.len() {
-        swap(&instructions[i]);
+pub fn part2(input: &str) -> usize {
+    let rows: Vec<_> = input.split('\n').collect();
+    let n_rows = rows.len();
+    let n_columns = rows[0].len();
+    let mut high_score = 0;
 
-        if let Ok(acc) = get_final_acc(&instructions) {
-            return acc;
+    for x in 0..n_rows {
+        for y in 0..n_columns {
+            let score = score(&rows, (x, y), n_rows, n_columns);
+
+            if score > high_score {
+                high_score = score;
+            }
         }
-
-        swap(&instructions[i]);
     }
 
-    unreachable!()
+    high_score
 }
