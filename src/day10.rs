@@ -1,115 +1,97 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, hash::Hash};
 
-use lazy_static::lazy_static;
-use regex::Regex;
+use aoc_runner_derive::aoc;
 
-lazy_static! {
-    static ref FORMAT: Regex = Regex::new(r"position=<\s?(-?\d+), \s?(-?\d+)> velocity=<\s?(-?\d+), \s?(-?\d+)>").unwrap();
+#[derive(Debug)]
+enum Instruction {
+    Noop,
+    Addx(i32),
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct Point {
-    x: i64,
-    y: i64,
-    velocity_x: i64,
-    velocity_y: i64,
-}
-
-#[aoc_generator(day10)]
-pub fn input_generator(input: &str) -> Vec<Point> {
-    FORMAT.captures_iter(input).map(|cap| {
-        let x = cap[1].parse::<i64>().unwrap();
-        let y = cap[2].parse::<i64>().unwrap();
-        let velocity_x = cap[3].parse::<i64>().unwrap();
-        let velocity_y = cap[4].parse::<i64>().unwrap();
-
-        Point {
-            x, y, velocity_x, velocity_y,
-        }
-    }).collect()
-}
-
-fn print_points(points: &[Point]) -> String {
-    let mut string = String::new();
-
-    string.push('\n');
-
-    let lowest_x = points.iter().min_by_key(|p| p.x).unwrap().x;
-    let lowest_y = points.iter().min_by_key(|p| p.y).unwrap().y;
-    let largest_x = points.iter().max_by_key(|p| p.x).unwrap().x;
-    let largest_y = points.iter().max_by_key(|p| p.y).unwrap().y;
-    let point_map: HashSet<_> = points.iter().map(|p| (p.x, p.y)).collect();
-
-    for y in lowest_y..=largest_y {
-        for x in lowest_x..=largest_x {
-            if !point_map.contains(&(x, y)) {
-                string.push('.');
-
-                continue;
-            }
-
-            string.push('#');
-        }
-
-        string.push('\n');
-    }
-
-    string.push('\n');
-    string
-}
-
-fn calc_area(points: &[Point]) -> u64 {
-    let lowest_x = points.iter().min_by_key(|p| p.x).unwrap().x;
-    let lowest_y = points.iter().min_by_key(|p| p.y).unwrap().y;
-    let largest_x = points.iter().max_by_key(|p| p.x).unwrap().x;
-    let largest_y = points.iter().max_by_key(|p| p.y).unwrap().y;
-
-    ((largest_y - lowest_y) * (largest_x - lowest_x)) as u64
-}
-
-fn find_lowest_area_points(points: &[Point]) -> (i64, Vec<Point>) {
-    let mut points2 = points.into_iter().map(|x| *x).collect::<Vec<Point>>();
-    let mut variance = u64::max_value();
-    let mut variance_i = 0;
-
-    // Find minimum area
-    for i in 1.. {
-        // Update positions
-        for mut point in points2.iter_mut() {
-            point.x += point.velocity_x;
-            point.y += point.velocity_y;
-        }
-
-        let var = calc_area(&points2);
-
-        if var < variance {
-            variance = var;
-            variance_i = i;
+fn instructions(input: &str) -> impl Iterator<Item = Instruction> + '_ {
+    input.split('\n').map(|line| {
+        if line.starts_with("noop") {
+            Instruction::Noop
         } else {
-            break;
+            let (_, right) = line.split_at(5);
+            Instruction::Addx(right.parse().unwrap())
         }
-    }
-
-    let mut points3 = points.into_iter().map(|x| *x).collect::<Vec<Point>>();
-
-    for mut point in points3.iter_mut() {
-        point.x += point.velocity_x * variance_i;
-        point.y += point.velocity_y * variance_i;
-    }
-
-    (variance_i, points3)
+    })
 }
 
 #[aoc(day10, part1, Chars)]
-pub fn part1_chars(points: &[Point]) -> String {
-    let (_, points) = find_lowest_area_points(points);
+pub fn part1_chars(input: &str) -> i32 {
+    let instructions = instructions(input);
+    let mut reg_x = 1;
+    let mut cycles = Vec::new();
 
-    print_points(&points)
+    for instr in instructions {
+        cycles.push(Instruction::Noop);
+
+        let Instruction::Addx(_) = instr else {
+            continue;
+        };
+
+        cycles.push(instr);
+    }
+
+    let mut signal_strength = 0;
+
+    for (i, instr) in cycles.iter().enumerate() {
+        if i == 19 || (i > 19 && (i - 19) % 40 == 0) {
+            signal_strength += reg_x * (i + 1) as i32;
+        }
+
+        let Instruction::Addx(val) = instr else {
+            continue;
+        };
+
+        reg_x += val;
+    }
+
+    signal_strength
 }
 
 #[aoc(day10, part2, Chars)]
-pub fn part2_chars(points: &[Point]) -> i64 {
-    let (i, _) = find_lowest_area_points(points);
+pub fn part2_chars(input: &str) -> String {
+    let mut s = String::with_capacity(241);
+    s.push('\n');
 
-    i
+    let instructions = instructions(input);
+    let mut reg_x = 1;
+    let mut cycles = Vec::new();
+    let mut pixels = HashSet::new();
+
+    for instr in instructions {
+        cycles.push(Instruction::Noop);
+
+        let Instruction::Addx(_) = instr else {
+            continue;
+        };
+
+        cycles.push(instr);
+    }
+
+    for (crt_i, instr) in cycles.iter().enumerate() {
+        if (reg_x - 1..reg_x + 2).contains(&((crt_i % 40) as i32)) {
+            pixels.insert(crt_i);
+        }
+
+        if let Instruction::Addx(val) = instr {
+            reg_x += val;
+        }
+    }
+
+    let mut s = String::new();
+
+    s.push('\n');
+
+    for i in 0..240 {
+        s.push(if pixels.contains(&i) { '#' } else { '.' });
+
+        if (i + 1) % 40 == 0 {
+            s.push('\n');
+        }
+    }
+    s
 }
