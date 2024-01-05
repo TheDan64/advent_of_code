@@ -1,116 +1,67 @@
 use aoc_runner_derive::aoc;
-use std::cmp::Ordering::{self, *};
-use RPS::*;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum RPS {
-    Rock,
-    Paper,
-    Scissors,
-}
-
-impl RPS {
-    fn score(&self) -> u32 {
-        match self {
-            Self::Rock => 1,
-            Self::Paper => 2,
-            Self::Scissors => 3,
-        }
-    }
-}
-
-impl Ord for RPS {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match (self, other) {
-            (Rock, Rock) | (Paper, Paper) | (Scissors, Scissors) => Equal,
-            (Rock, Scissors) | (Paper, Rock) | (Scissors, Paper) => Greater,
-            (Rock, Paper) | (Paper, Scissors) | (Scissors, Rock) => Less,
-        }
-    }
-}
-
-impl PartialOrd for RPS {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-enum XYZ {
-    X,
-    Y,
-    Z,
-}
-
-impl From<XYZ> for RPS {
-    fn from(xyz: XYZ) -> Self {
-        match xyz {
-            XYZ::X => Rock,
-            XYZ::Y => Paper,
-            XYZ::Z => Scissors,
-        }
-    }
-}
-
-impl From<XYZ> for Ordering {
-    fn from(xyz: XYZ) -> Self {
-        match xyz {
-            XYZ::X => Greater,
-            XYZ::Y => Equal,
-            XYZ::Z => Less,
-        }
-    }
-}
-
-fn rounds<'s>(input: &'s str) -> impl Iterator<Item = (RPS, XYZ)> + 's {
-    input.split('\n').map(|round| {
-        let (left, right) = round.split_once(' ').unwrap();
-        let left = match left {
-            "A" => Rock,
-            "B" => Paper,
-            "C" => Scissors,
-            _ => unreachable!(),
-        };
-        let right = match right {
-            "X" => XYZ::X,
-            "Y" => XYZ::Y,
-            "Z" => XYZ::Z,
-            _ => unreachable!(),
-        };
-
-        (left, right)
-    })
-}
-
-fn score(left: RPS, right: RPS) -> u32 {
-    if right > left {
-        6 + right.score()
-    } else if right == left {
-        3 + right.score()
-    } else {
-        right.score()
-    }
-}
 
 #[aoc(day2, part1)]
 pub fn part1(input: &str) -> u32 {
-    rounds(input)
-        .map(|(left, right)| score(left, RPS::from(right)))
-        .sum()
+    let line_iter = input.split('\n');
+    let mut sum = 0;
+
+    for line in line_iter {
+        let (game, data) = line.split_once(": ").unwrap();
+        let game_id = game.split_once("Game ").unwrap().1.parse::<u32>().unwrap();
+        let cube_iter = data.split([',', ';']);
+        let mut invalid = false;
+
+        for cube in cube_iter {
+            let (digit, color) = cube.trim().split_once(' ').unwrap();
+            let digit = digit.parse::<u32>().unwrap();
+
+            match color {
+                "green" if digit > 13 => invalid = true,
+                "red" if digit > 12 => invalid = true,
+                "blue" if digit > 14 => invalid = true,
+                _ => (),
+            }
+        }
+
+        if !invalid {
+            sum += game_id;
+        }
+    }
+
+    sum
 }
 
 #[aoc(day2, part2)]
 pub fn part2(input: &str) -> u32 {
-    rounds(input)
-        .map(|(left, right)| {
-            let result = Ordering::from(right);
+    let line_iter = input.split('\n');
+    let mut sum = 0;
 
-            for hand in [Rock, Paper, Scissors] {
-                if left.cmp(&hand) == result {
-                    return score(left, hand);
-                }
+    for line in line_iter {
+        let (_game, data) = line.split_once(": ").unwrap();
+        let cube_iter = data.split([',', ';']);
+
+        let mut reds = Vec::new();
+        let mut greens = Vec::new();
+        let mut blues = Vec::new();
+
+        for cube in cube_iter {
+            let (digit, color) = cube.trim().split_once(' ').unwrap();
+            let digit = digit.parse::<u32>().unwrap();
+
+            match color {
+                "green" => greens.push(digit),
+                "red" => reds.push(digit),
+                "blue" => blues.push(digit),
+                _ => (),
             }
+        }
 
-            unreachable!()
-        })
-        .sum()
+        let red_max = reds.iter().max().unwrap();
+        let green_max = greens.iter().max().unwrap();
+        let blue_max = blues.iter().max().unwrap();
+
+        sum += *red_max * *green_max * *blue_max;
+    }
+
+    sum
 }
