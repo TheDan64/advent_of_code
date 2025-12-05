@@ -1,51 +1,90 @@
-use aoc_runner_derive::aoc;
+use std::collections::HashSet;
 
-fn pairs<'s>(input: &'s str) -> impl Iterator<Item = ((u8, u8), (u8, u8))> + 's {
-    input.split('\n').map(|line| {
-        let (left, right) = line.split_once(',').unwrap();
-        let (lstart, lend) = left.split_once('-').unwrap();
-        let (rstart, rend) = right.split_once('-').unwrap();
-        let lstart = lstart.parse::<u8>().unwrap();
-        let lend = lend.parse::<u8>().unwrap();
-        let rstart = rstart.parse::<u8>().unwrap();
-        let rend = rend.parse::<u8>().unwrap();
+use aoc_runner_derive::{aoc, aoc_generator};
 
-        ((lstart, lend), (rstart, rend))
-    })
+type Coord = (usize, usize);
+type Input = (usize, usize, HashSet<Coord>);
+
+#[aoc_generator(day4)]
+pub fn input_generator(input: &str) -> Input {
+    let grid_x = input.lines().next().unwrap().len();
+    let grid_y = input.lines().count();
+    let mut map = HashSet::with_capacity(grid_x * grid_y);
+
+    for (y, row) in input.lines().enumerate() {
+        for (x, item) in row.chars().enumerate() {
+            if item == '@' {
+                map.insert((x, y));
+            }
+        }
+    }
+
+    (grid_x, grid_y, map)
+}
+
+fn rolls_to_remove(grid_x: usize, grid_y: usize, map: &HashSet<Coord>) -> Vec<Coord> {
+    let mut to_remove = Vec::new();
+
+    for y in 0..grid_y {
+        for x in 0..grid_x {
+            if !map.contains(&(x, y)) {
+                continue;
+            }
+
+            let mut count = 0;
+
+            for offset_x in [x.checked_sub(1), Some(x), Some(x + 1)] {
+                let Some(offset_x) = offset_x else {
+                    continue;
+                };
+
+                for offset_y in [y.checked_sub(1), Some(y), Some(y + 1)] {
+                    let Some(offset_y) = offset_y else {
+                        continue;
+                    };
+
+                    if offset_x == x && offset_y == y {
+                        continue;
+                    }
+
+                    if map.contains(&(offset_x, offset_y)) {
+                        count += 1;
+                    }
+                }
+            }
+
+            if count < 4 {
+                to_remove.push((x, y));
+            }
+        }
+    }
+
+    to_remove
 }
 
 #[aoc(day4, part1)]
-pub fn part1(input: &str) -> u64 {
-    pairs(input)
-        .map(|(left, right)| {
-            if (left.0 >= right.0 && left.1 <= right.1) || (right.0 >= left.0 && right.1 <= left.1)
-            {
-                1
-            } else {
-                0
-            }
-        })
-        .sum::<u64>()
-}
-
-fn overlap(min1: u8, max1: u8, min2: u8, max2: u8) -> u8 {
-    0.max(match max1.min(max2).checked_sub(min1.max(min2)) {
-        Some(val) => val + 1,
-        None => 0,
-    })
+pub fn part1((grid_x, grid_y, map): &Input) -> usize {
+    rolls_to_remove(*grid_x, *grid_y, map).len()
 }
 
 #[aoc(day4, part2)]
-pub fn part2(input: &str) -> u64 {
-    pairs(input)
-        .map(|(left, right)| {
-            let overlap = overlap(left.0, left.1, right.0, right.1);
+pub fn part2((grid_x, grid_y, map): &Input) -> usize {
+    let mut map = map.clone();
+    let mut total = 0;
 
-            if overlap > 0 {
-                1
-            } else {
-                0
-            }
-        })
-        .sum::<u64>()
+    loop {
+        let to_remove = rolls_to_remove(*grid_x, *grid_y, &map);
+
+        if to_remove.is_empty() {
+            break;
+        }
+
+        total += to_remove.len();
+
+        for coord in to_remove {
+            map.remove(&coord);
+        }
+    }
+
+    total
 }
