@@ -1,72 +1,118 @@
 use aoc_runner_derive::aoc;
-use itertools::Itertools;
-use lazy_static::lazy_static;
-use regex::Regex;
 
-lazy_static! {
-    static ref MOVE_RE: Regex = Regex::new(r"move (\d+) from (\d+) to (\d+)").unwrap();
-    static ref STACKS_RE: Regex = Regex::new(r"(\[([A-Z])\]\s)|(\s{4})").unwrap();
-}
+#[aoc(day5, part1)]
+pub fn part1(input: &str) -> u64 {
+    let mut iter = input.split("\n\n");
+    let ranges = iter
+        .next()
+        .unwrap()
+        .lines()
+        .map(|line| {
+            let mut parts = line.split('-');
+            let start = parts.next().unwrap().parse::<u64>().unwrap();
+            let end = parts.next().unwrap().parse::<u64>().unwrap();
+            start..=end
+        })
+        .collect::<Vec<_>>();
+    let ids = iter
+        .next()
+        .unwrap()
+        .lines()
+        .map(|id| id.parse::<u64>().unwrap());
 
-struct Move {
-    num: u8,
-    from: u8,
-    to: u8,
-}
+    let mut total = 0;
 
-fn stacks<'s>(input: &'s str) -> (Vec<Vec<&'s str>>, impl Iterator<Item = Move> + 's) {
-    let (stacks, instructions) = input.split_once("\n\n").unwrap();
-    let num_stacks = stacks[stacks.len() - 2..stacks.len() - 1]
-        .parse::<usize>()
-        .unwrap();
-    let stack_chunks = STACKS_RE.captures_iter(stacks).chunks(num_stacks);
-    let mut stacks = vec![Vec::new(); num_stacks];
-
-    for chunk in &stack_chunks {
-        for (i, cap) in chunk.enumerate() {
-            if let Some(letter) = cap.get(2) {
-                stacks[i].insert(0, letter.as_str());
+    for id in ids {
+        for range in &ranges {
+            if range.contains(&id) {
+                // dbg!((id, range));
+                total += 1;
+                break;
             }
         }
     }
 
-    let instructions = MOVE_RE.captures_iter(instructions).map(|cap| Move {
-        num: cap[1].parse::<u8>().unwrap(),
-        from: cap[2].parse::<u8>().unwrap(),
-        to: cap[3].parse::<u8>().unwrap(),
-    });
-
-    (stacks, instructions)
-}
-
-#[aoc(day5, part1)]
-pub fn part1(input: &str) -> String {
-    let (mut stacks, moves) = stacks(input);
-
-    for mut instruction in moves {
-        while instruction.num > 0 {
-            instruction.num -= 1;
-            let letter = stacks[instruction.from as usize - 1].pop().unwrap();
-            stacks[instruction.to as usize - 1].push(letter);
-        }
-    }
-
-    stacks.iter().map(|vec| *vec.last().unwrap()).collect()
+    total
 }
 
 #[aoc(day5, part2)]
-pub fn part2(input: &str) -> String {
-    let (mut stacks, moves) = stacks(input);
+pub fn part2(input: &str) -> u64 {
+    let mut ranges = Vec::new();
+    let mut iter = input.split("\n\n");
+    let iter = iter.next().unwrap().lines().map(|line| {
+        let mut parts = line.split('-');
+        let start = parts.next().unwrap().parse::<u64>().unwrap();
+        let end = parts.next().unwrap().parse::<u64>().unwrap();
+        (start, end)
+    });
 
-    for mut instruction in moves {
-        let insert_at = stacks[instruction.to as usize - 1].len();
-
-        while instruction.num > 0 {
-            instruction.num -= 1;
-            let letter = stacks[instruction.from as usize - 1].pop().unwrap();
-            stacks[instruction.to as usize - 1].insert(insert_at, letter);
+    'outer: for (mut start, end) in iter {
+        if ranges.is_empty() {
+            ranges.push((start, end));
+            continue;
         }
+
+        let mut i = usize::MAX;
+
+        loop {
+            i = i.wrapping_add(1);
+
+            let Some(existing) = ranges.get_mut(i) else {
+                break;
+            };
+
+            // Check for overlap
+            if start < existing.0 && end >= existing.0 {
+                let existing_start = existing.0;
+                let existing_end = existing.1;
+
+                ranges.insert(i, (start, existing_start - 1));
+
+                start = existing_end + 1;
+                // i += 1;
+                continue;
+            }
+
+            if end > existing.1 && start <= existing.1 {
+                start = existing.1 + 1;
+
+                if start > end {
+                    continue 'outer;
+                }
+            }
+
+            if start >= existing.0 && end <= existing.1 {
+                continue 'outer;
+            }
+
+            if end < existing.0 {
+                ranges.insert(i, (start, end));
+                continue 'outer;
+            }
+        }
+
+        ranges.push((start, end));
     }
 
-    stacks.iter().map(|vec| *vec.last().unwrap()).collect()
+    ranges.iter().map(|(start, end)| end - start + 1).sum()
+}
+
+#[test]
+fn test_day5_part2() {
+    let input = "3-5
+10-14
+16-20
+12-18
+
+32";
+    let input2 = "3-5
+10-14
+16-20
+12-18
+9-21
+
+32";
+
+    assert_eq!(part2(input), 14);
+    assert_eq!(part2(input2), 16);
 }
